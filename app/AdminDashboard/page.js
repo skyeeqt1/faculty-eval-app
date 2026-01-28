@@ -37,7 +37,6 @@ export default function AdminDashboard() {
   const [studentEmail, setStudentEmail] = useState('')
   const [studentPassword, setStudentPassword] = useState('')
 
-  // Updated to Indigo focus theme
   const fieldFocusClasses = "focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:scale-[1.01] transition-all duration-300 ease-out"
 
   useEffect(() => {
@@ -164,7 +163,7 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-[#0f172a] text-slate-200 p-4 md:p-8 relative overflow-x-hidden font-sans">
       
-      {/* Background Glows switched to Indigo/Violet */}
+      {/* Background Glows */}
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600/5 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-violet-600/5 blur-[120px] pointer-events-none" />
 
@@ -240,31 +239,43 @@ export default function AdminDashboard() {
 
       <div className={`max-w-7xl mx-auto transition-all duration-500 ${toast.show || confirmModal.show || selectedProfDetails || errorModal.show ? 'blur-md scale-[0.98] opacity-50' : 'opacity-100'}`}>
         
-        {/* Header - Updated to Indigo */}
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-10 gap-6 bg-slate-900/50 p-6 rounded-[2rem] border border-white/10 backdrop-blur-md">
-          <div className="w-full lg:w-auto">
-            <h1 className="text-3xl font-black tracking-tight text-white uppercase italic">Admin<span className="text-indigo-500">Panel</span></h1>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]"></span>
-              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em]">Root Authorization Active</p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-            <button onClick={() => router.push('/AdminDashboard/StudentList')} className="cursor-pointer flex-1 lg:flex-none px-6 py-3 rounded-xl font-bold text-[10px] bg-slate-800 text-slate-300 border border-white/5 hover:bg-slate-700 transition-all uppercase tracking-widest active:scale-95">VIEW STUDENTS</button>
-            <button onClick={() => router.push('/AdminDashboard/Results')} className="cursor-pointer flex-1 lg:flex-none px-6 py-3 rounded-xl font-bold text-[10px] bg-indigo-600 text-white hover:bg-indigo-500 transition-all uppercase tracking-widest shadow-lg shadow-indigo-600/20 active:scale-95">VIEW RESULTS</button>
-            <button onClick={async () => {
-              const newStatus = !isFormOpen; setIsFormOpen(newStatus);
-              await setDoc(doc(db, "settings", "formConfig"), { isOpen: newStatus, updatedAt: new Date() });
-              showToast(`System ${newStatus ? 'Opened' : 'Closed'}`);
-            }} className={`cursor-pointer flex-1 lg:flex-none px-6 py-3 rounded-xl font-bold text-[10px] transition-all uppercase tracking-widest active:scale-95 border ${isFormOpen ? "bg-emerald-600/10 border-emerald-500/50 text-emerald-500" : "bg-slate-800 border-white/10 text-slate-400"}`}>
-              {isFormOpen ? "PORTAL: LIVE" : "PORTAL: CLOSED"}
-            </button>
-            <button onClick={() => signOut(auth)} className="cursor-pointer px-4 py-3 text-slate-500 hover:text-rose-400 text-[10px] font-black uppercase transition-colors">Logout</button>
-          </div>
-        </div>
+        {/* --- HEADER --- */}
+<div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-10 gap-6 bg-slate-900/50 p-6 rounded-[2rem] border border-white/10 backdrop-blur-md relative">
+  
+  {/* Mobile Logout Button (Pin to Upper Right) */}
+  <button 
+    onClick={() => signOut(auth)} 
+    className="lg:hidden absolute top-6 right-8 text-slate-500 hover:text-rose-400 text-[9px] font-black uppercase tracking-widest transition-colors cursor-pointer z-20"
+  >
+    Logout
+  </button>
+
+  <div className="w-full lg:w-auto mt-2 lg:mt-0">
+    <h1 className="text-3xl font-black tracking-tight text-white uppercase italic">Admin<span className="text-indigo-500">Panel</span></h1>
+    <div className="flex items-center gap-2 mt-1">
+      <span className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]"></span>
+      <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em]">Root Authorization Active</p>
+    </div>
+  </div>
+
+  <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+    <button onClick={() => router.push('/AdminDashboard/StudentList')} className="cursor-pointer flex-1 lg:flex-none px-6 py-3 rounded-xl font-bold text-[10px] bg-slate-800 text-slate-300 border border-white/5 hover:bg-slate-700 transition-all uppercase tracking-widest active:scale-95">VIEW STUDENTS</button>
+    <button onClick={() => router.push('/AdminDashboard/Results')} className="cursor-pointer flex-1 lg:flex-none px-6 py-3 rounded-xl font-bold text-[10px] bg-indigo-600 text-white hover:bg-indigo-500 transition-all uppercase tracking-widest shadow-lg shadow-indigo-600/20 active:scale-95">VIEW RESULTS</button>
+    <button onClick={async () => {
+      const newStatus = !isFormOpen; setIsFormOpen(newStatus);
+      await setDoc(doc(db, "settings", "formConfig"), { isOpen: newStatus, updatedAt: new Date() });
+      showToast(`System ${newStatus ? 'Opened' : 'Closed'}`);
+    }} className={`cursor-pointer flex-1 lg:flex-none px-6 py-3 rounded-xl font-bold text-[10px] transition-all uppercase tracking-widest active:scale-95 border ${isFormOpen ? "bg-emerald-600/10 border-emerald-500/50 text-emerald-500" : "bg-slate-800 border-white/10 text-slate-400"}`}>
+      {isFormOpen ? "PORTAL: LIVE" : "PORTAL: CLOSED"}
+    </button>
+    
+    {/* Desktop Logout Button (Hidden on Mobile) */}
+    <button onClick={() => signOut(auth)} className="hidden lg:block cursor-pointer px-4 py-3 text-slate-500 hover:text-rose-400 text-[10px] font-black uppercase transition-colors">Logout</button>
+  </div>
+</div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
-          {/* Add Faculty Form - Updated focus states */}
+          {/* Add Faculty Form */}
           <div className="lg:col-span-4 bg-slate-900 rounded-[2.5rem] p-6 md:p-8 border border-white/5 shadow-2xl">
             <h2 className="text-xl font-black mb-8 text-white uppercase tracking-tight flex items-center gap-3">
               <span className="w-2 h-2 bg-indigo-500 rounded-full"></span>
@@ -344,7 +355,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Student Access - Restored Middle Name */}
+          {/* Student Access */}
           <div className="lg:col-span-4 bg-slate-900 rounded-[2.5rem] p-6 md:p-8 border border-white/5 shadow-2xl h-fit">
             <h2 className="text-xl font-black mb-8 text-white uppercase tracking-tight flex items-center gap-3">
               <span className="w-2 h-2 bg-slate-400 rounded-full"></span>
