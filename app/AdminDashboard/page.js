@@ -37,11 +37,11 @@ export default function AdminDashboard() {
   const [studentEmail, setStudentEmail] = useState('')
   const [studentPassword, setStudentPassword] = useState('')
 
-  const fieldFocusClasses = "focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:scale-[1.01] transition-all duration-300 ease-out"
+  // Updated to Indigo focus theme
+  const fieldFocusClasses = "focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:scale-[1.01] transition-all duration-300 ease-out"
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      // STRICT ADMIN CHECK
       if (user && user.email.toLowerCase() === "admintest@gmail.com") {
         fetchSettings()
         const unsubProfs = onSnapshot(collection(db, "professors"), (snap) => {
@@ -53,7 +53,6 @@ export default function AdminDashboard() {
         setLoading(false)
         return () => { unsubProfs(); unsubSubs(); }
       } else { 
-        // If not logged in as admin, boot to login page
         router.replace('/') 
       }
     })
@@ -158,16 +157,16 @@ export default function AdminDashboard() {
 
   if (loading) return (
     <div className="min-h-screen bg-[#0f172a] flex items-center justify-center">
-      <div className="text-center font-bold text-blue-400 uppercase tracking-[0.3em] animate-pulse">Initializing Admin...</div>
+      <div className="text-center font-bold text-indigo-400 uppercase tracking-[0.3em] animate-pulse">Initializing Admin...</div>
     </div>
   )
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-slate-200 p-4 md:p-8 relative overflow-x-hidden font-sans">
       
-      {/* Background Glows */}
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/5 blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-indigo-600/5 blur-[120px] pointer-events-none" />
+      {/* Background Glows switched to Indigo/Violet */}
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600/5 blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-violet-600/5 blur-[120px] pointer-events-none" />
 
       {/* --- MODALS --- */}
       {errorModal.show && (
@@ -186,7 +185,7 @@ export default function AdminDashboard() {
       {selectedProfDetails && (
         <div className="fixed inset-0 flex items-center justify-center z-[130] bg-slate-950/80 backdrop-blur-md p-4" onClick={() => setSelectedProfDetails(null)}>
           <div className="bg-slate-900 border border-white/10 rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl animate-center-pop relative overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-r from-blue-600/20 to-indigo-600/20" />
+            <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-r from-indigo-600/20 to-violet-600/20" />
             <button onClick={() => setSelectedProfDetails(null)} className="absolute top-6 right-6 text-slate-400 hover:text-white transition-colors cursor-pointer z-10">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
@@ -197,7 +196,7 @@ export default function AdminDashboard() {
                 alt={selectedProfDetails.name}
               />
               <h3 className="text-2xl font-black text-white text-center">{selectedProfDetails.name}</h3>
-              <span className="text-xs font-black text-blue-400 uppercase tracking-widest mt-1">{selectedProfDetails.yearLevel} Instructor</span>
+              <span className="text-xs font-black text-indigo-400 uppercase tracking-widest mt-1">{selectedProfDetails.yearLevel} Instructor</span>
               <div className="w-full h-px bg-white/5 my-6" />
               <div className="w-full">
                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Subjects</p>
@@ -241,18 +240,18 @@ export default function AdminDashboard() {
 
       <div className={`max-w-7xl mx-auto transition-all duration-500 ${toast.show || confirmModal.show || selectedProfDetails || errorModal.show ? 'blur-md scale-[0.98] opacity-50' : 'opacity-100'}`}>
         
-        {/* Header */}
+        {/* Header - Updated to Indigo */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-10 gap-6 bg-slate-900/50 p-6 rounded-[2rem] border border-white/10 backdrop-blur-md">
           <div className="w-full lg:w-auto">
-            <h1 className="text-3xl font-black tracking-tight text-white uppercase italic">Admin<span className="text-blue-500">Panel</span></h1>
+            <h1 className="text-3xl font-black tracking-tight text-white uppercase italic">Admin<span className="text-indigo-500">Panel</span></h1>
             <div className="flex items-center gap-2 mt-1">
-              <span className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]"></span>
+              <span className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]"></span>
               <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em]">Root Authorization Active</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
             <button onClick={() => router.push('/AdminDashboard/StudentList')} className="cursor-pointer flex-1 lg:flex-none px-6 py-3 rounded-xl font-bold text-[10px] bg-slate-800 text-slate-300 border border-white/5 hover:bg-slate-700 transition-all uppercase tracking-widest active:scale-95">VIEW STUDENTS</button>
-            <button onClick={() => router.push('/AdminDashboard/Results')} className="cursor-pointer flex-1 lg:flex-none px-6 py-3 rounded-xl font-bold text-[10px] bg-indigo-600 text-white hover:bg-indigo-500 transition-all uppercase tracking-widest shadow-lg shadow-blue-600/20 active:scale-95">VIEW RESULTS</button>
+            <button onClick={() => router.push('/AdminDashboard/Results')} className="cursor-pointer flex-1 lg:flex-none px-6 py-3 rounded-xl font-bold text-[10px] bg-indigo-600 text-white hover:bg-indigo-500 transition-all uppercase tracking-widest shadow-lg shadow-indigo-600/20 active:scale-95">VIEW RESULTS</button>
             <button onClick={async () => {
               const newStatus = !isFormOpen; setIsFormOpen(newStatus);
               await setDoc(doc(db, "settings", "formConfig"), { isOpen: newStatus, updatedAt: new Date() });
@@ -265,20 +264,20 @@ export default function AdminDashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
-          {/* Add Faculty Form */}
+          {/* Add Faculty Form - Updated focus states */}
           <div className="lg:col-span-4 bg-slate-900 rounded-[2.5rem] p-6 md:p-8 border border-white/5 shadow-2xl">
             <h2 className="text-xl font-black mb-8 text-white uppercase tracking-tight flex items-center gap-3">
-              <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+              <span className="w-2 h-2 bg-indigo-500 rounded-full"></span>
               Add Faculty Member
             </h2>
             <form onSubmit={handleAddProfessor} className="space-y-5">
               <div className="space-y-1.5 group">
-                <label className="text-[10px] font-bold text-slate-500 uppercase ml-1 group-focus-within:text-blue-400 transition-colors">Name</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase ml-1 group-focus-within:text-indigo-400 transition-colors">Name</label>
                 <input type="text" placeholder="Full Name" value={newProfName} onChange={(e) => setNewProfName(e.target.value)} className={`w-full bg-slate-800 border border-slate-700 p-4 rounded-xl outline-none text-white text-base md:text-sm ${fieldFocusClasses}`} />
               </div>
 
               <div className="space-y-1.5 relative group">
-                <label className="text-[10px] font-bold text-slate-500 uppercase ml-1 group-focus-within:text-blue-400 transition-colors">Year Level</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase ml-1 group-focus-within:text-indigo-400 transition-colors">Year Level</label>
                 <div className="relative">
                   <select value={yearLevel} onChange={(e) => { setYearLevel(e.target.value); setSelectedProfSubjects([]); }} className={`cursor-pointer w-full bg-slate-800 border border-slate-700 p-4 pr-10 rounded-xl outline-none text-white font-bold text-base md:text-sm appearance-none ${fieldFocusClasses}`}>
                     {['1st Year', '2nd Year', '3rd Year', '4th Year'].map(y => <option key={y} value={y}>{y}</option>)}
@@ -289,11 +288,11 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="bg-slate-950/50 rounded-2xl p-5 border border-white/5 transition-all focus-within:border-blue-500/30">
-                <label className="text-[10px] font-black text-blue-400 uppercase mb-3 block tracking-widest">Subjects</label>
+              <div className="bg-slate-950/50 rounded-2xl p-5 border border-white/5 transition-all focus-within:border-indigo-500/30">
+                <label className="text-[10px] font-black text-indigo-400 uppercase mb-3 block tracking-widest">Subjects</label>
                 <div className="flex flex-wrap gap-2 mb-4 min-h-[40px]">
                   {selectedProfSubjects.map((s, i) => (
-                    <span key={i} className="bg-blue-600/10 border border-blue-600/20 text-blue-400 px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-2 animate-center-pop">
+                    <span key={i} className="bg-indigo-600/10 border border-indigo-600/20 text-indigo-400 px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-2 animate-center-pop">
                       {s} <button type="button" onClick={() => setSelectedProfSubjects(selectedProfSubjects.filter(x => x !== s))} className="cursor-pointer hover:text-white text-base px-1 leading-none">×</button>
                     </span>
                   ))}
@@ -310,7 +309,7 @@ export default function AdminDashboard() {
               </div>
 
               <div className="space-y-1.5 group">
-                <label className="text-[10px] font-bold text-slate-500 uppercase ml-1 group-focus-within:text-blue-400 transition-colors">Profile Image URL</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase ml-1 group-focus-within:text-indigo-400 transition-colors">Profile Image URL</label>
                 <input type="text" placeholder="https://image-link.com/photo.jpg" value={newProfImage} onChange={(e) => setNewProfImage(e.target.value)} className={`w-full bg-slate-800 border border-slate-700 p-4 rounded-xl outline-none text-white text-base md:text-sm ${fieldFocusClasses}`} />
               </div>
 
@@ -345,7 +344,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Student Access */}
+          {/* Student Access - Restored Middle Name */}
           <div className="lg:col-span-4 bg-slate-900 rounded-[2.5rem] p-6 md:p-8 border border-white/5 shadow-2xl h-fit">
             <h2 className="text-xl font-black mb-8 text-white uppercase tracking-tight flex items-center gap-3">
               <span className="w-2 h-2 bg-slate-400 rounded-full"></span>
@@ -430,7 +429,7 @@ export default function AdminDashboard() {
                     {allSubjects.map((s) => (
                       <tr key={s.id} className="hover:bg-white/5 transition-colors">
                         <td className="p-5 font-bold text-slate-300 text-sm">{s.name}</td>
-                        <td className="p-5"><span className="text-[9px] font-black bg-blue-500/10 text-blue-400 px-3 py-1.5 rounded-lg uppercase border border-blue-500/20">{s.yearLevel}</span></td>
+                        <td className="p-5"><span className="text-[9px] font-black bg-indigo-500/10 text-indigo-400 px-3 py-1.5 rounded-lg uppercase border border-indigo-500/20">{s.yearLevel}</span></td>
                         <td className="p-5 text-right">
                           <button onClick={() => handleDeleteSubject(s.id)} className="cursor-pointer text-slate-500 hover:text-rose-500 p-2 transition-all active:scale-90">
                             <svg className="w-4 h-4 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -448,7 +447,7 @@ export default function AdminDashboard() {
 
       <style jsx>{`
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.05); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.2); border-radius: 10px; }
         @keyframes center-pop { 0% { transform: scale(0.98); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         .animate-center-pop { animation: center-pop 0.3s ease-out forwards; }
         select { -webkit-appearance: none; -moz-appearance: none; appearance: none; }

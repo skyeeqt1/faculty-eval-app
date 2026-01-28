@@ -54,8 +54,7 @@ export default function LoginPage() {
         }
       }
 
-      // 2. Student Logic (Refined Firestore Query)
-      // We query by email first to check if the user exists
+      // 2. Student Logic
       const studentQuery = query(
         collection(db, "authorized_students"),
         where("email", "==", cleanEmail)
@@ -67,7 +66,6 @@ export default function LoginPage() {
         const studentDoc = querySnapshot.docs[0]
         const studentData = studentDoc.data()
 
-        // Check if plain-text password matches exactly
         if (studentData.password === password) {
           localStorage.setItem("studentSession", JSON.stringify({
             email: studentData.email,
@@ -84,7 +82,6 @@ export default function LoginPage() {
           })
           setTimeout(() => router.push('/StudentDashboard'), 2000)
         } else {
-          // Email exists, but password is wrong
           setPopup({ 
             show: true, 
             message: "Access Denied: The security password provided is incorrect.", 
@@ -92,7 +89,6 @@ export default function LoginPage() {
           })
         }
       } else {
-        // Email doesn't exist in the 'authorized_students' collection
         setPopup({ 
           show: true, 
           message: "Access Denied: This email is not registered in our student directory.", 
@@ -113,9 +109,10 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-[#0f172a] flex items-center justify-center px-4 relative overflow-hidden font-sans">
-      {/* Background Decorative Elements */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-blue-600/10 blur-[120px]" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-600/10 blur-[120px]" />
+      
+      {/* Background Decorative Elements - Changed to Indigo/Violet */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-600/10 blur-[120px]" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-violet-600/10 blur-[120px]" />
       
       {/* --- POPUP MODAL --- */}
       {popup.show && (
@@ -135,7 +132,7 @@ export default function LoginPage() {
             </h2>
             <p className="text-slate-400 text-center text-sm mb-6 leading-relaxed">{popup.message}</p>
             {!popup.isSuccess && (
-              <button onClick={() => setPopup({ show: false, message: '', isSuccess: false })} className="cursor-pointer w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl hover:bg-blue-500 transition-all active:scale-[0.98] uppercase text-[10px] tracking-widest">
+              <button onClick={() => setPopup({ show: false, message: '', isSuccess: false })} className="cursor-pointer w-full bg-indigo-600 text-white font-bold py-3.5 rounded-xl hover:bg-indigo-500 transition-all active:scale-[0.98] uppercase text-[10px] tracking-widest">
                 Try Again
               </button>
             )}
@@ -151,12 +148,13 @@ export default function LoginPage() {
       {/* --- LOGIN CARD --- */}
       <div className={`bg-slate-900 w-full max-w-md p-8 md:p-12 rounded-[2.5rem] shadow-2xl border border-white/5 transition-all duration-500 ${popup.show ? 'blur-md opacity-50 scale-95' : 'opacity-100'}`}>
         <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-full text-[11px] font-black text-blue-400 uppercase tracking-[0.2em] mb-6">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
+            {/* Badge updated to Indigo */}
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-[11px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
               Security Protocol
             </div>
             <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic leading-none">
-              Faculty <span className="text-blue-500">Evaluation</span>
+              Faculty <span className="text-indigo-500">Evaluation</span>
             </h2>
             <p className="text-slate-500 mt-3 text-[10px] font-bold uppercase tracking-[0.3em]">Access Portal</p>
         </div>
@@ -169,7 +167,7 @@ export default function LoginPage() {
               required
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className="w-full bg-slate-800 p-4 rounded-xl border border-slate-700 focus:border-blue-500 outline-none font-medium text-white transition-all placeholder:text-slate-600"
+              className="w-full bg-slate-800 p-4 rounded-xl border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none font-medium text-white transition-all placeholder:text-slate-600"
               placeholder="Username"
             />
           </div>
@@ -181,7 +179,7 @@ export default function LoginPage() {
               required
               value={password}
               onChange={e => setPassword(e.target.value)}
-              className="w-full bg-slate-800 p-4 rounded-xl border border-slate-700 focus:border-blue-500 outline-none font-medium text-white transition-all placeholder:text-slate-600"
+              className="w-full bg-slate-800 p-4 rounded-xl border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none font-medium text-white transition-all placeholder:text-slate-600"
               placeholder="Password"
             />
           </div>
@@ -189,7 +187,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading || popup.isSuccess}
-            className="cursor-pointer w-full bg-indigo-600 text-white py-4 rounded-xl font-bold uppercase tracking-widest text-[10px] hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
+            className="cursor-pointer w-full bg-indigo-600 text-white py-4 rounded-xl font-bold uppercase tracking-widest text-[10px] hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 active:scale-[0.98]"
           >
             {loading ? (
               <>

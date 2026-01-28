@@ -15,32 +15,21 @@ export default function StudentPage() {
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // 1. Admin Redirect
         if (user.email.toLowerCase() === "admintest@gmail.com") {
           router.replace('/AdminDashboard')
           return
         }
 
-        // 2. Fetch Real Name from Firestore
         try {
-          /** * THE FIX: 
-           * We use user.email.toLowerCase() as the ID because that is 
-           * how you saved it in the Admin Panel registration logic.
-           */
           const studentEmailId = user.email.toLowerCase().trim();
           const userDocRef = doc(db, "users", studentEmailId)
           const userSnap = await getDoc(userDocRef)
 
           if (userSnap.exists()) {
             const userData = userSnap.data()
-            console.log("Found Student Profile:", userData)
-            
-            // This will now correctly grab "John"
             const displayName = userData.firstName || userData.name || user.email.split('@')[0]
             setUserName(displayName)
           } else {
-            // Fallback if document isn't found
-            console.warn("No document found for ID:", studentEmailId)
             setUserName(user.email.split('@')[0])
           }
         } catch (error) {
@@ -49,7 +38,6 @@ export default function StudentPage() {
         }
         setLoading(false)
       } else {
-        // 3. Fallback for non-authenticated state
         const studentSession = localStorage.getItem("studentSession")
         if (studentSession) {
           const data = JSON.parse(studentSession)
@@ -87,7 +75,7 @@ export default function StudentPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0f172a]">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-blue-600/20 border-t-blue-500 rounded-full animate-spin"></div>
+          <div className="w-12 h-12 border-4 border-indigo-600/20 border-t-indigo-500 rounded-full animate-spin"></div>
           <p className="text-slate-500 font-black text-[10px] uppercase tracking-[0.3em]">Syncing Session...</p>
         </div>
       </div>
@@ -97,18 +85,18 @@ export default function StudentPage() {
   return (
     <div className="min-h-screen bg-[#0f172a] flex flex-col items-center p-6 md:p-12 font-sans text-slate-200 relative overflow-hidden">
       
-      {/* Background Glows */}
-      <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-600/5 blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-indigo-600/5 blur-[120px] pointer-events-none" />
+      {/* Background Glows - Updated to Indigo/Violet */}
+      <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-indigo-600/5 blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-violet-600/5 blur-[120px] pointer-events-none" />
 
       {/* Header */}
       <div className="w-full max-w-5xl flex flex-col md:flex-row justify-between items-start md:items-center mb-12 mt-4 gap-6 z-10">
         <div>
           <h1 className="text-3xl md:text-4xl font-black text-white tracking-tighter uppercase italic">
-            Hello, <span className="text-blue-500">{userName}</span>
+            Hello, <span className="text-indigo-500">{userName}</span>
           </h1>
           <div className="flex items-center gap-2 mt-2">
-            <span className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]"></span>
+            <span className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]"></span>
             <p className="text-slate-500 font-bold text-[10px] uppercase tracking-widest">Student Portal Access Active</p>
           </div>
         </div>
@@ -121,10 +109,10 @@ export default function StudentPage() {
 
       <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 z-10">
         <div className="lg:col-span-8 space-y-8">
-          {/* Step 1: Year Level */}
+          {/* Step 1: Year Level - Updated to Indigo */}
           <div className="bg-slate-900 rounded-[2.5rem] border border-white/5 p-8 md:p-10 shadow-2xl">
-            <h3 className="text-sm font-black text-blue-400 uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
-                <span className="w-6 h-6 rounded-lg bg-blue-500/10 flex items-center justify-center text-[10px]">01</span>
+            <h3 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
+                <span className="w-6 h-6 rounded-lg bg-indigo-500/10 flex items-center justify-center text-[10px]">01</span>
                 Select Academic Year
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -134,7 +122,7 @@ export default function StudentPage() {
                   onClick={() => setYearLevel(year)}
                   className={`cursor-pointer py-4 px-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all border-2 ${
                     yearLevel === year 
-                    ? 'border-blue-600 bg-blue-600/10 text-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.1)]' 
+                    ? 'border-indigo-600 bg-indigo-600/10 text-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.1)]' 
                     : 'border-slate-800 bg-slate-800/50 text-slate-500 hover:border-slate-700 hover:text-slate-300'
                   }`}
                 >
@@ -144,12 +132,12 @@ export default function StudentPage() {
             </div>
           </div>
 
-          {/* Step 2: Evaluation Button */}
+          {/* Step 2: Evaluation Button - Updated to Indigo */}
           <div className="bg-slate-900 rounded-[2.5rem] border border-white/5 p-8 md:p-10 shadow-2xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/5 blur-3xl group-hover:bg-blue-600/10 transition-colors" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/5 blur-3xl group-hover:bg-indigo-600/10 transition-colors" />
             
-            <h3 className="text-sm font-black text-blue-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
-                <span className="w-6 h-6 rounded-lg bg-blue-500/10 flex items-center justify-center text-[10px]">02</span>
+            <h3 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
+                <span className="w-6 h-6 rounded-lg bg-indigo-500/10 flex items-center justify-center text-[10px]">02</span>
                 System Authorization
             </h3>
             
@@ -163,7 +151,7 @@ export default function StudentPage() {
             <button
               disabled={!yearLevel || !isFormOpen}
               onClick={() => router.push(`/Evaluation?year=${encodeURIComponent(yearLevel)}`)}
-              className="cursor-pointer group flex items-center justify-center w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed text-white font-black py-5 px-12 rounded-2xl transition-all shadow-lg shadow-blue-600/10 uppercase text-[11px] tracking-[0.2em]"
+              className="cursor-pointer group flex items-center justify-center w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed text-white font-black py-5 px-12 rounded-2xl transition-all shadow-lg shadow-indigo-600/20 uppercase text-[11px] tracking-[0.2em]"
             >
               {!yearLevel ? "Identify Year Level First" : "Launch Evaluation"}
               <svg className="w-5 h-5 ml-3 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -185,15 +173,15 @@ export default function StudentPage() {
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2rem] border border-blue-500/10 p-8 shadow-2xl relative">
+          <div className="bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2rem] border border-indigo-500/10 p-8 shadow-2xl relative">
             <div className="flex items-center gap-3 mb-6">
-               <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-500/20">
-                  <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
-               </div>
-               <h3 className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Privacy Shield</h3>
+                <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center border border-indigo-500/20">
+                  <svg className="w-5 h-5 text-indigo-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                </div>
+                <h3 className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Privacy Shield</h3>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed font-bold uppercase tracking-wider">
-              Evaluations are <span className="text-blue-400">100% anonymous</span>. Your identity is scrubbed from the final report sent to faculty.
+              Evaluations are <span className="text-indigo-400">100% anonymous</span>. Your identity is scrubbed from the final report sent to faculty.
             </p>
           </div>
         </div>
