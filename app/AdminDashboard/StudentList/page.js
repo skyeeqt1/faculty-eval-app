@@ -294,7 +294,7 @@ export default function StudentListPage() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <button onClick={() => router.back()} className="cursor-pointer text-indigo-400 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 mb-2 group">
-                <span className="group-hover:-translate-x-1 transition-transform">←</span> Control Center
+                <span className="group-hover:-translate-x-1 transition-transform">←</span> Dashboard
               </button>
               <h1 className="text-3xl sm:text-4xl font-black text-white uppercase tracking-tighter">Student<span className="text-indigo-500">Directory</span></h1>
             </div>
