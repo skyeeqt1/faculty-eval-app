@@ -15,7 +15,7 @@ export default function AdminDashboard() {
   const [isFormOpen, setIsFormOpen] = useState(true)
   
   const [toast, setToast] = useState({ show: false, message: '' })
-  const [confirmModal, setConfirmModal] = useState({ show: false, title: '', onConfirm: null })
+  const [confirmModal, setConfirmModal] = useState({ show: false, title: '', onConfirm: null, btnText: 'Confirm' })
   const [errorModal, setErrorModal] = useState({ show: false, message: '' })
   
   const [selectedProfDetails, setSelectedProfDetails] = useState(null)
@@ -87,8 +87,8 @@ export default function AdminDashboard() {
     setTimeout(() => setToast({ show: false, message: '' }), 2000)
   }
 
-  const triggerConfirm = (title, action) => {
-    setConfirmModal({ show: true, title, onConfirm: action })
+  const triggerConfirm = (title, action, btnText = "Confirm") => {
+    setConfirmModal({ show: true, title, onConfirm: action, btnText })
   }
 
   const handleAddProfessor = async (e) => {
@@ -119,7 +119,7 @@ export default function AdminDashboard() {
         await deleteDoc(doc(db, "professors", id))
         showToast("Removed Successfully")
       } catch (err) { showError(err.message) }
-    })
+    }, "Delete")
   }
 
   const handleDeleteSubject = (id) => {
@@ -128,7 +128,7 @@ export default function AdminDashboard() {
         await deleteDoc(doc(db, "subjects", id))
         showToast("Subject Deleted")
       } catch (err) { showError(err.message) }
-    })
+    }, "Delete")
   }
 
   const handleAddStudent = async (e) => {
@@ -213,14 +213,19 @@ export default function AdminDashboard() {
       {confirmModal.show && (
         <div className="fixed inset-0 flex items-center justify-center z-[110] bg-slate-950/90 backdrop-blur-md p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-8 max-w-sm w-full shadow-2xl animate-center-pop">
-            <div className="w-14 h-14 bg-rose-500/10 text-rose-500 rounded-2xl flex items-center justify-center mb-6 border border-rose-500/20">
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 border ${confirmModal.btnText === 'Delete' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' : 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20'}`}>
               <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
             </div>
             <h3 className="text-xl font-bold text-white mb-2 tracking-tight">System Confirmation</h3>
             <p className="text-slate-400 text-sm mb-8 leading-relaxed">{confirmModal.title}</p>
             <div className="grid grid-cols-2 gap-3">
               <button onClick={() => setConfirmModal({ ...confirmModal, show: false })} className="cursor-pointer py-3.5 bg-slate-800 text-slate-300 rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-slate-700 transition-all">Cancel</button>
-              <button onClick={() => { confirmModal.onConfirm(); setConfirmModal({ ...confirmModal, show: false }); }} className="cursor-pointer py-3.5 bg-rose-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-rose-700 shadow-lg shadow-rose-600/20 transition-all">Delete</button>
+              <button 
+                onClick={() => { confirmModal.onConfirm(); setConfirmModal({ ...confirmModal, show: false }); }} 
+                className={`cursor-pointer py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-lg active:scale-95 text-white ${confirmModal.btnText === 'Delete' ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/20' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20'}`}
+              >
+                {confirmModal.btnText}
+              </button>
             </div>
           </div>
         </div>
@@ -240,39 +245,48 @@ export default function AdminDashboard() {
       <div className={`max-w-7xl mx-auto transition-all duration-500 ${toast.show || confirmModal.show || selectedProfDetails || errorModal.show ? 'blur-md scale-[0.98] opacity-50' : 'opacity-100'}`}>
         
         {/* --- HEADER --- */}
-<div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-10 gap-6 bg-slate-900/50 p-6 rounded-[2rem] border border-white/10 backdrop-blur-md relative">
-  
-  {/* Mobile Logout Button (Pin to Upper Right) */}
-  <button 
-    onClick={() => signOut(auth)} 
-    className="lg:hidden absolute top-6 right-8 text-slate-500 hover:text-rose-400 text-[9px] font-black uppercase tracking-widest transition-colors cursor-pointer z-20"
-  >
-    Logout
-  </button>
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-10 gap-6 bg-slate-900/50 p-6 rounded-[2rem] border border-white/10 backdrop-blur-md relative">
+          
+          {/* Mobile Logout Button */}
+          <button 
+            onClick={() => signOut(auth)} 
+            className="lg:hidden absolute top-6 right-8 text-slate-500 hover:text-rose-400 text-[9px] font-black uppercase tracking-widest transition-colors cursor-pointer z-20"
+          >
+            Logout
+          </button>
 
-  <div className="w-full lg:w-auto mt-2 lg:mt-0">
-    <h1 className="text-3xl font-black tracking-tight text-white uppercase italic">Admin<span className="text-indigo-500">Panel</span></h1>
-    <div className="flex items-center gap-2 mt-1">
-      <span className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]"></span>
-      <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em]">Root Authorization Active</p>
-    </div>
-  </div>
+          <div className="w-full lg:w-auto mt-2 lg:mt-0">
+            <h1 className="text-3xl font-black tracking-tight text-white uppercase italic">Admin<span className="text-indigo-500">Panel</span></h1>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]"></span>
+              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em]">Root Authorization Active</p>
+            </div>
+          </div>
 
-  <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-    <button onClick={() => router.push('/AdminDashboard/StudentList')} className="cursor-pointer flex-1 lg:flex-none px-6 py-3 rounded-xl font-bold text-[10px] bg-slate-800 text-slate-300 border border-white/5 hover:bg-slate-700 transition-all uppercase tracking-widest active:scale-95">VIEW STUDENTS</button>
-    <button onClick={() => router.push('/AdminDashboard/Results')} className="cursor-pointer flex-1 lg:flex-none px-6 py-3 rounded-xl font-bold text-[10px] bg-indigo-600 text-white hover:bg-indigo-500 transition-all uppercase tracking-widest shadow-lg shadow-indigo-600/20 active:scale-95">VIEW RESULTS</button>
-    <button onClick={async () => {
-      const newStatus = !isFormOpen; setIsFormOpen(newStatus);
-      await setDoc(doc(db, "settings", "formConfig"), { isOpen: newStatus, updatedAt: new Date() });
-      showToast(`System ${newStatus ? 'Opened' : 'Closed'}`);
-    }} className={`cursor-pointer flex-1 lg:flex-none px-6 py-3 rounded-xl font-bold text-[10px] transition-all uppercase tracking-widest active:scale-95 border ${isFormOpen ? "bg-emerald-600/10 border-emerald-500/50 text-emerald-500" : "bg-slate-800 border-white/10 text-slate-400"}`}>
-      {isFormOpen ? "PORTAL: LIVE" : "PORTAL: CLOSED"}
-    </button>
-    
-    {/* Desktop Logout Button (Hidden on Mobile) */}
-    <button onClick={() => signOut(auth)} className="hidden lg:block cursor-pointer px-4 py-3 text-slate-500 hover:text-rose-400 text-[10px] font-black uppercase transition-colors">Logout</button>
-  </div>
-</div>
+          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+            <button onClick={() => router.push('/AdminDashboard/StudentList')} className="cursor-pointer flex-1 lg:flex-none px-6 py-3 rounded-xl font-bold text-[10px] bg-slate-800 text-slate-300 border border-white/5 hover:bg-slate-700 transition-all uppercase tracking-widest active:scale-95">VIEW STUDENTS</button>
+            <button onClick={() => router.push('/AdminDashboard/Results')} className="cursor-pointer flex-1 lg:flex-none px-6 py-3 rounded-xl font-bold text-[10px] bg-indigo-600 text-white hover:bg-indigo-500 transition-all uppercase tracking-widest shadow-lg shadow-indigo-600/20 active:scale-95">VIEW RESULTS</button>
+            
+            {/* PORTAL TOGGLE WITH CONFIRMATION */}
+            <button onClick={() => {
+              const nextStatus = !isFormOpen;
+              const actionText = nextStatus ? "OPEN the evaluation portal" : "CLOSE the evaluation portal";
+              triggerConfirm(
+                `Are you sure you want to ${actionText}?`, 
+                async () => {
+                  await setDoc(doc(db, "settings", "formConfig"), { isOpen: nextStatus, updatedAt: new Date() });
+                  setIsFormOpen(nextStatus);
+                  showToast(`System ${nextStatus ? 'Opened' : 'Closed'}`);
+                },
+                "Proceed"
+              );
+            }} className={`cursor-pointer flex-1 lg:flex-none px-6 py-3 rounded-xl font-bold text-[10px] transition-all uppercase tracking-widest active:scale-95 border ${isFormOpen ? "bg-emerald-600/10 border-emerald-500/50 text-emerald-500" : "bg-slate-800 border-white/10 text-slate-400"}`}>
+              {isFormOpen ? "PORTAL: LIVE" : "PORTAL: CLOSED"}
+            </button>
+            
+            <button onClick={() => signOut(auth)} className="hidden lg:block cursor-pointer px-4 py-3 text-slate-500 hover:text-rose-400 text-[10px] font-black uppercase transition-colors">Logout</button>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
           {/* Add Faculty Form */}
