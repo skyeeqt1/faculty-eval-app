@@ -10,8 +10,6 @@ import { useRouter } from 'next/navigation'
 export default function RealTimeResults() {
   const [professors, setProfessors] = useState([])
   const [loading, setLoading] = useState(true)
-  
-  // FIX: Prevents the "first-click" redirect bug by waiting for Firebase
   const [authLoading, setAuthLoading] = useState(true) 
   
   const [selectedProf, setSelectedProf] = useState(null)
@@ -25,19 +23,14 @@ export default function RealTimeResults() {
   const router = useRouter()
 
   useEffect(() => {
-    // 1. Monitor Auth State
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        router.replace('/')
-      } else if (user.email.toLowerCase() !== "admintest@gmail.com") {
+      if (!user || user.email.toLowerCase() !== "admintest@gmail.com") {
         router.replace('/')
       } else {
-        // Only stop the loading screen once user is verified
         setAuthLoading(false)
       }
     })
 
-    // 2. Real-time Data Listener
     const q = query(collection(db, "evaluations"), orderBy("submittedAt", "desc"))
     const unsubscribeData = onSnapshot(q, (snapshot) => {
       const allEvals = snapshot.docs.map(doc => ({
@@ -49,7 +42,7 @@ export default function RealTimeResults() {
         const profName = curr.professorName || "Unknown Professor"
         const subjectName = curr.subject || "General"
         const ratingValue = parseFloat(curr.rating) || 0
-        const comment = curr.comment || ""
+        const comment = curr.comment ? curr.comment.trim() : ""
 
         if (!acc[profName]) {
           acc[profName] = {
@@ -70,7 +63,8 @@ export default function RealTimeResults() {
 
         acc[profName].subjects[subjectName].totalRating += ratingValue
         acc[profName].subjects[subjectName].count += 1
-        if(comment.trim() && comment !== "No comment provided") {
+        
+        if(comment && comment !== "No comment provided") {
             acc[profName].subjects[subjectName].comments.push(comment)
         }
         
@@ -98,7 +92,6 @@ export default function RealTimeResults() {
     }
   }, [router])
 
-  // --- Reset Logic ---
   const handleResetEvaluations = async () => {
     setIsResetting(true)
     try {
@@ -111,7 +104,6 @@ export default function RealTimeResults() {
       setShowResetConfirm(false)
     } catch (error) {
       console.error("Reset failed:", error)
-      alert("Failed to reset evaluations.")
     } finally {
       setIsResetting(false)
     }
@@ -120,14 +112,11 @@ export default function RealTimeResults() {
   const handleClose = () => {
     setIsExiting(true)
     setTimeout(() => {
-      setSelectedProf(null)
-      setSelectedSubject(null)
-      setViewComments(false)
-      setIsExiting(false)
+      setSelectedProf(null); setSelectedSubject(null);
+      setViewComments(false); setIsExiting(false);
     }, 150)
   }
 
-  // --- LOADING STATES ---
   if (authLoading) return (
     <div className="min-h-screen bg-[#0f172a] flex items-center justify-center">
       <div className="text-center">
@@ -149,7 +138,6 @@ export default function RealTimeResults() {
   return (
     <div className="min-h-screen bg-[#0f172a] text-slate-200 p-4 md:p-8 relative overflow-x-hidden font-sans pb-24 md:pb-8">
       
-      {/* Background Glow */}
       <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-blue-600/10 blur-[100px] pointer-events-none" />
 
       {/* --- RESET CONFIRMATION MODAL --- */}
@@ -201,7 +189,7 @@ export default function RealTimeResults() {
                       const subAvg = (data.totalRating / data.count);
                       const isSelected = selectedSubject === subName;
                       return (
-                        <div key={i} onClick={() => setSelectedSubject(subName)} className={`flex-1 min-w-[70px] flex flex-col items-center group relative h-full justify-end cursor-pointer transition-all ${selectedSubject && !isSelected ? 'opacity-20' : 'opacity-100'}`}>
+                        <div key={i} onClick={() => {setSelectedSubject(subName); setViewComments(false);}} className={`flex-1 min-w-[70px] flex flex-col items-center group relative h-full justify-end cursor-pointer transition-all ${selectedSubject && !isSelected ? 'opacity-20' : 'opacity-100'}`}>
                           <div className={`w-12 sm:w-16 rounded-t-xl overflow-hidden relative border transition-all h-full ${isSelected ? 'border-blue-400 ring-4 ring-blue-500/20' : 'border-white/5 bg-slate-800/40'}`}>
                             <div className={`absolute bottom-0 w-full bg-gradient-to-t transition-all duration-1000 ${isSelected ? 'from-blue-500 to-indigo-400 shadow-[0_0_20px_rgba(59,130,246,0.5)]' : 'from-slate-700 to-slate-500'}`} style={{ height: `${(subAvg / 10) * 100}%` }} />
                           </div>
@@ -217,9 +205,14 @@ export default function RealTimeResults() {
                       <div className="mt-16 p-6 bg-blue-600/5 border border-blue-500/10 rounded-3xl flex justify-between items-center animate-pop-in">
                           <div>
                               <p className="text-[9px] font-black text-blue-500 uppercase tracking-[0.2em]">Subject Insight</p>
-                              <h4 className="text-white font-bold">{selectedProf.subjects[selectedSubject].count} Responses</h4>
+                              {/* Restored accurate count for specific subject comments */}
+                              <h4 className="text-white font-bold">{selectedProf.subjects[selectedSubject].comments.length} Responses</h4>
                           </div>
-                          <button onClick={() => setViewComments(true)} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-blue-600/20 cursor-pointer">View Subject Comments</button>
+                          {selectedProf.subjects[selectedSubject].comments.length > 0 ? (
+                            <button onClick={() => setViewComments(true)} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-blue-600/20 cursor-pointer">View Subject Comments</button>
+                          ) : (
+                            <span className="text-[9px] font-black text-slate-600 uppercase border border-white/5 px-4 py-2 rounded-xl">No specific comments found</span>
+                          )}
                       </div>
                   )}
                 </div>
@@ -227,13 +220,9 @@ export default function RealTimeResults() {
                 <div className="animate-pop-in h-full">
                     <h3 className="text-white font-black uppercase text-xs italic tracking-widest mb-6">Student Feedback for {selectedSubject}</h3>
                     <div className="space-y-4 max-h-[300px] overflow-y-auto pr-4 custom-scrollbar">
-                        {selectedProf.subjects[selectedSubject].comments.length > 0 ? (
-                            selectedProf.subjects[selectedSubject].comments.map((comm, idx) => (
-                                <div key={idx} className="bg-white/5 p-4 rounded-2xl border border-white/5 text-slate-300 text-xs leading-relaxed italic">"{comm}"</div>
-                            ))
-                        ) : (
-                            <div className="text-center py-10"><p className="text-slate-600 uppercase font-black tracking-widest text-[9px]">No specific comments found</p></div>
-                        )}
+                        {selectedProf.subjects[selectedSubject].comments.map((comm, idx) => (
+                            <div key={idx} className="bg-white/5 p-4 rounded-2xl border border-white/5 text-slate-300 text-xs leading-relaxed italic">"{comm}"</div>
+                        ))}
                     </div>
                 </div>
               )}
@@ -279,49 +268,32 @@ export default function RealTimeResults() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:gap-6">
-          {professors.length === 0 ? (
-             <div className="text-center py-20 bg-slate-900/30 rounded-[2.5rem] border border-dashed border-white/10">
-                <p className="text-slate-500 font-bold uppercase tracking-[0.3em] text-[10px]">No evaluation data found</p>
-             </div>
-          ) : (
-            professors.map((prof, idx) => (
-              <div 
-                key={idx} 
-                onClick={() => setSelectedProf(prof)}
-                className="bg-slate-900/50 border border-white/5 rounded-[1.8rem] sm:rounded-[2.5rem] p-5 sm:p-8 hover:border-blue-500/30 transition-all active:scale-[0.98] cursor-pointer shadow-xl"
-              >
-                <div className="flex flex-col gap-5">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center text-blue-500 font-black text-lg border border-white/5">
-                      {prof.name.charAt(0)}
-                    </div>
-                    <div className="flex-1 overflow-hidden">
-                      <h2 className="text-lg font-bold text-white truncate">{prof.name}</h2>
-                      <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest">{prof.overallCount} Feedbacks</p>
-                    </div>
-                    <div className="flex items-center gap-2 bg-black/40 px-3 py-2 rounded-xl border border-white/5">
-                      <span className="text-xl font-black text-white italic">{prof.finalAvg.toFixed(1)}</span>
-                    </div>
+          {professors.map((prof, idx) => (
+            <div 
+              key={idx} 
+              onClick={() => setSelectedProf(prof)}
+              className="bg-slate-900/50 border border-white/5 rounded-[1.8rem] sm:rounded-[2.5rem] p-5 sm:p-8 hover:border-blue-500/30 transition-all active:scale-[0.98] cursor-pointer shadow-xl"
+            >
+              <div className="flex flex-col gap-5">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center text-blue-500 font-black text-lg border border-white/5">
+                    {prof.name.charAt(0)}
                   </div>
-                  <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500" style={{ width: `${(prof.finalAvg / 10) * 100}%` }} />
+                  <div className="flex-1 overflow-hidden">
+                    <h2 className="text-lg font-bold text-white truncate">{prof.name}</h2>
+                    <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest">{prof.overallCount} Feedbacks</p>
+                  </div>
+                  <div className="flex items-center gap-2 bg-black/40 px-3 py-2 rounded-xl border border-white/5">
+                    <span className="text-xl font-black text-white italic">{prof.finalAvg.toFixed(1)}</span>
                   </div>
                 </div>
+                <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-blue-500" style={{ width: `${(prof.finalAvg / 10) * 100}%` }} />
+                </div>
               </div>
-            ))
-          )}
+            </div>
+          ))}
         </div>
-      </div>
-
-      {/* --- FIXED MOBILE BUTTON --- */}
-      <div className="fixed bottom-6 left-0 right-0 px-6 sm:hidden z-[90]">
-        <button 
-          onClick={() => router.push('/AdminDashboard')} 
-          className="cursor-pointer w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-2xl shadow-blue-600/30 active:scale-95 transition-all flex items-center justify-center gap-2 border border-white/10 backdrop-blur-sm"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-          Return to Dashboard
-        </button>
       </div>
 
       <style jsx>{`
