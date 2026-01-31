@@ -1,156 +1,117 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { db, auth } from '../../../lib/firebase'
+import { db } from '../../../lib/firebase'
 import { 
-  collection, deleteDoc, doc, onSnapshot, query, orderBy, addDoc, serverTimestamp, getDocs, writeBatch 
+  collection, deleteDoc, doc, onSnapshot, query, orderBy, addDoc, 
+  serverTimestamp, getDocs, writeBatch, updateDoc 
 } from 'firebase/firestore'
-import { useRouter } from 'next/navigation'
-import { onAuthStateChanged } from 'firebase/auth'
 
 export default function StudentListPage() {
-  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [students, setStudents] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [isAddFormOpen, setIsAddFormOpen] = useState(false)
   
-  // Modals & UI States
-  const [selectedStudent, setSelectedStudent] = useState(null)
+  const [newStudent, setNewStudent] = useState({ firstName: '', lastName: '', email: '', password: '' })
+  
   const [confirmModal, setConfirmModal] = useState({ show: false, id: null, name: '' })
   const [resetConfirmModal, setResetConfirmModal] = useState({ show: false, student: null })
   const [globalVoteResetModal, setGlobalVoteResetModal] = useState(false)
-  const [passwordModal, setPasswordModal] = useState({ show: false, password: '', name: '' })
-  const [errorModal, setErrorModal] = useState({ show: false, message: '' })
   
   const [deleteReason, setDeleteReason] = useState('')
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [isResetting, setIsResetting] = useState(false)
-  const [isGlobalResetting, setIsGlobalResetting] = useState(false)
   const [toast, setToast] = useState({ show: false, message: '' })
+  const [generatedPassword, setGeneratedPassword] = useState('')
+  const [copied, setCopied] = useState(false)
 
-  // --- AUTH CHECK: MATCHES ADMIN DASHBOARD ---
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      // Strict Admin check - if not met, boot back to root Login page
-      if (user && user.email.toLowerCase() === "admintest@gmail.com") {
-        const q = query(collection(db, "authorized_students"), orderBy("createdAt", "desc"))
-        const unsubStudents = onSnapshot(q, (snap) => {
-          const data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-          setStudents(data)
-          setLoading(false)
-        })
-        return () => unsubStudents()
-      } else {
-        router.replace('/') 
-      }
+    const q = query(collection(db, "authorized_students"), orderBy("createdAt", "desc"))
+    const unsubStudents = onSnapshot(q, (snap) => {
+      setStudents(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      setLoading(false)
     })
-    return () => unsubscribe()
-  }, [router])
+    return () => unsubStudents()
+  }, [])
+
+  const generateRandomPassword = () => {
+    const charset = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let pwd = "";
+    for (let i = 0; i < 10; i++) pwd += charset.charAt(Math.floor(Math.random() * charset.length))
+    setNewStudent({ ...newStudent, password: pwd })
+  }
+
+  const handleAddStudent = async (e) => {
+    e.preventDefault()
+    if (!newStudent.firstName || !newStudent.lastName || !newStudent.email || !newStudent.password) {
+      return showToast("All fields are required")
+    }
+
+    try {
+      await addDoc(collection(db, "authorized_students"), {
+        firstName: newStudent.firstName.trim(),
+        lastName: newStudent.lastName.trim(),
+        email: newStudent.email.trim().toLowerCase(),
+        password: newStudent.password,
+        mustChangePassword: true,
+        hasEvaluate: false,
+        createdAt: serverTimestamp()
+      })
+      setNewStudent({ firstName: '', lastName: '', email: '', password: '' })
+      setIsAddFormOpen(false)
+      showToast("Student Registered")
+    } catch (err) { showToast("Error adding student") }
+  }
+
+  const executeGlobalVoteReset = async () => {
+    try {
+      const batch = writeBatch(db)
+      const studentSnapshot = await getDocs(collection(db, "authorized_students"))
+      studentSnapshot.forEach((studentDoc) => {
+        batch.update(studentDoc.ref, { hasEvaluate: false, EvaluateAt: null })
+      })
+      const statusSnapshot = await getDocs(collection(db, "submissionStatus"))
+      statusSnapshot.forEach((statusDoc) => { batch.delete(statusDoc.ref) })
+      await batch.commit()
+      showToast("Global status reset")
+      setGlobalVoteResetModal(false)
+    } catch (err) { showToast("Global reset failed") }
+  }
+
+  const executePasswordReset = async () => {
+    const student = resetConfirmModal.student
+    if (!student) return
+    try {
+      const charset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+      let tempPassword = ""
+      for (let i = 0; i < 8; i++) tempPassword += charset.charAt(Math.floor(Math.random() * charset.length))
+      await updateDoc(doc(db, "authorized_students", student.id), { 
+        password: tempPassword, 
+        mustChangePassword: true, 
+        passwordResetAt: serverTimestamp() 
+      })
+      setGeneratedPassword(tempPassword)
+      setResetConfirmModal({ show: false, student: null })
+    } catch (err) { showToast("Reset failed") }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteReason.trim()) return
+    try {
+      await deleteDoc(doc(db, "authorized_students", confirmModal.id))
+      setConfirmModal({ show: false, id: null, name: '' })
+      setDeleteReason('')
+      showToast("Access Revoked")
+    } catch (err) { showToast("Revoke failed") }
+  }
 
   const showToast = (msg) => {
     setToast({ show: true, message: msg })
     setTimeout(() => setToast({ show: false, message: '' }), 2500)
   }
 
-  const copyToClipboard = (text) => {
-    if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(text);
-    } else {
-      const textArea = document.createElement("textarea");
-      textArea.value = text;
-      textArea.style.position = "fixed";
-      textArea.style.left = "-9999px";
-      textArea.style.top = "0";
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-      try { document.execCommand('copy'); } catch (err) { console.error(err); }
-      document.body.removeChild(textArea);
-    }
-    showToast("Copied to clipboard");
-  };
-
-  // --- FULL GLOBAL RESET: WIPES BOTH COLLECTIONS ---
-  const executeGlobalVoteReset = async () => {
-    setIsGlobalResetting(true)
-    try {
-      const batch = writeBatch(db)
-      
-      // 1. Reset 'hasEvaluate' flags in authorized_students so students can re-access the form
-      const studentSnapshot = await getDocs(collection(db, "authorized_students"))
-      studentSnapshot.forEach((studentDoc) => {
-        batch.update(studentDoc.ref, {
-          hasEvaluate: false,
-          EvaluateAt: null
-        })
-      })
-
-      // 2. Delete all records in submissionStatus so the portal thinks nobody has voted yet
-      const statusSnapshot = await getDocs(collection(db, "submissionStatus"))
-      statusSnapshot.forEach((statusDoc) => {
-        batch.delete(statusDoc.ref)
-      })
-
-      await batch.commit()
-      
-      await addDoc(collection(db, "audit_logs"), {
-        action: "GLOBAL_VOTE_STATUS_RESET",
-        adminEmail: auth.currentUser?.email,
-        timestamp: serverTimestamp(),
-        details: "Reset submissionStatus collections"
-      })
-
-      showToast("All voting records cleared")
-      setGlobalVoteResetModal(false)
-    } catch (err) {
-      setErrorModal({ show: true, message: "Global reset failed: " + err.message })
-    } finally {
-      setIsGlobalResetting(false)
-    }
-  }
-
-  const executePasswordReset = async () => {
-    const student = resetConfirmModal.student;
-    if (!student) return;
-    setIsResetting(true)
-    // Stronger temporary password generation
-    const newPass = Math.random().toString(36).slice(-8) + "!" + Math.floor(Math.random() * 99)
-    try {
-      await addDoc(collection(db, "audit_logs"), {
-        action: "PASSWORD_RESET_GENERATED",
-        studentName: `${student.firstName} ${student.lastName}`,
-        studentEmail: student.email,
-        timestamp: serverTimestamp()
-      })
-      setPasswordModal({ show: true, password: newPass, name: student.firstName })
-      setResetConfirmModal({ show: false, student: null })
-      setSelectedStudent(null) 
-    } catch (err) {
-      setErrorModal({ show: true, message: "Failed: " + err.message })
-    } finally { setIsResetting(false) }
-  }
-
-  const handleDelete = async () => {
-    if (!deleteReason.trim()) {
-      setErrorModal({ show: true, message: "A reason is required." })
-      return
-    }
-    setIsDeleting(true)
-    try {
-      await addDoc(collection(db, "audit_logs"), {
-        action: "REVOKE_STUDENT_ACCESS",
-        studentName: confirmModal.name,
-        studentId: confirmModal.id,
-        reason: deleteReason,
-        timestamp: serverTimestamp()
-      })
-      await deleteDoc(doc(db, "authorized_students", confirmModal.id))
-      setConfirmModal({ show: false, id: null, name: '' })
-      setSelectedStudent(null)
-      setDeleteReason('')
-      showToast("Access Revoked Successfully")
-    } catch (err) {
-      setErrorModal({ show: true, message: "Revoke failed: " + err.message })
-    } finally { setIsDeleting(false) }
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(generatedPassword)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   const filteredStudents = students.filter(s => 
@@ -159,218 +120,168 @@ export default function StudentListPage() {
   )
 
   if (loading) return (
-    <div className="min-h-screen bg-[#0f172a] flex items-center justify-center">
-      <div className="text-center font-bold text-indigo-400 uppercase tracking-widest animate-pulse text-xs">Syncing Directory...</div>
+    <div className="flex-1 flex items-center justify-center bg-[#0f172a]">
+      <div className="text-indigo-400 font-black uppercase tracking-[0.3em]">Syncing Directory...</div>
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-200 p-4 sm:p-6 md:p-8 font-sans selection:bg-indigo-500/30">
+    <div className="p-4 md:p-12 max-w-6xl mx-auto w-full h-screen flex flex-col space-y-8 overflow-hidden">
       
-      {toast.show && (
-        <div className="fixed top-6 left-4 right-4 md:left-1/2 md:right-auto md:-translate-x-1/2 z-[200]">
-          <div className="bg-emerald-500 text-white px-6 py-4 rounded-2xl shadow-2xl font-bold text-[10px] uppercase tracking-widest text-center animate-center-pop">
-            {toast.message}
-          </div>
+      {/* Header Actions - Non-scrollable */}
+      <div className="shrink-0 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <div>
+          <h2 className="text-2xl font-black text-white uppercase italic tracking-tight">Student Directory</h2>
+          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-1">Total Authorized: {students.length}</p>
         </div>
-      )}
+        <div className="flex flex-wrap gap-3">
+          <button onClick={() => setIsAddFormOpen(!isAddFormOpen)} className="flex-1 lg:flex-none px-6 py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest cursor-pointer hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20">
+            {isAddFormOpen ? 'Cancel Action' : 'Register Student'}
+          </button>
+          <button onClick={() => setGlobalVoteResetModal(true)} className="flex-1 lg:flex-none px-6 py-4 bg-emerald-600/10 border border-emerald-500/20 text-emerald-500 rounded-2xl font-black text-[10px] uppercase tracking-widest cursor-pointer hover:bg-emerald-600/20 transition-all">
+            Reset Mass Status
+          </button>
+        </div>
+      </div>
 
-      {/* --- MODALS --- */}
-
-      {globalVoteResetModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-[300] bg-slate-950/90 backdrop-blur-md p-4">
-          <div className="bg-slate-900 border border-emerald-500/20 rounded-[2.5rem] p-8 w-full max-w-sm text-center animate-center-pop">
-            <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-emerald-500/20">
-              <svg className="w-8 h-8 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-            </div>
-            <h3 className="text-xl font-black text-white uppercase mb-2">Reset All Votes?</h3>
-            <p className="text-slate-400 text-xs mb-8 leading-relaxed">This will allow EVERY student to vote again by clearing individual records and the system submission ledger.</p>
-            <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => setGlobalVoteResetModal(false)} className="cursor-pointer py-4 bg-slate-800 text-slate-400 rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:bg-slate-700 transition-all">Cancel</button>
-              <button disabled={isGlobalResetting} onClick={executeGlobalVoteReset} className="cursor-pointer py-4 bg-emerald-600 text-white rounded-2xl font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-500 transition-all">
-                {isGlobalResetting ? "Syncing..." : "Yes, Reset All"}
+      {/* Registration Form - Non-scrollable */}
+      {isAddFormOpen && (
+        <section className="shrink-0 bg-slate-900/50 border border-indigo-500/20 p-6 md:p-8 rounded-[2rem] backdrop-blur-sm shadow-2xl">
+          <form onSubmit={handleAddStudent} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <input type="text" placeholder="FIRST NAME" value={newStudent.firstName} onChange={(e) => setNewStudent({...newStudent, firstName: e.target.value})} className="bg-slate-800 border border-white/5 rounded-xl px-5 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white"/>
+            <input type="text" placeholder="LAST NAME" value={newStudent.lastName} onChange={(e) => setNewStudent({...newStudent, lastName: e.target.value})} className="bg-slate-800 border border-white/5 rounded-xl px-5 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white"/>
+            <input type="email" placeholder="EMAIL" value={newStudent.email} onChange={(e) => setNewStudent({...newStudent, email: e.target.value})} className="bg-slate-800 border border-white/5 rounded-xl px-5 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white lg:col-span-2 lg:md:col-span-1"/>
+            <div className="flex gap-2 lg:col-span-1">
+              <input type="text" placeholder="PWD" value={newStudent.password} onChange={(e) => setNewStudent({...newStudent, password: e.target.value})} className="flex-1 bg-slate-800 border border-white/5 rounded-xl px-5 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white"/>
+              <button type="button" onClick={generateRandomPassword} className="p-4 bg-indigo-600/10 text-indigo-400 rounded-xl hover:bg-indigo-600/20 cursor-pointer">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
               </button>
             </div>
+            <button type="submit" className="md:col-span-2 lg:col-span-4 py-4 bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest rounded-xl cursor-pointer hover:bg-indigo-500 transition-all mt-2">Register Student</button>
+          </form>
+        </section>
+      )}
+
+      {/* Filter - Non-scrollable */}
+      <div className="shrink-0 relative group">
+        <input 
+          type="text" placeholder="Filter by name or email..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full bg-slate-900/50 border border-white/5 p-5 rounded-2xl outline-none text-white text-xs font-bold uppercase tracking-widest focus:border-indigo-500/50 transition-all"
+        />
+      </div>
+
+      {/* List Table - SCROLLABLE SECTION */}
+      <section className="flex-1 min-h-0 bg-slate-900/50 border border-white/5 rounded-[2.5rem] flex flex-col overflow-hidden backdrop-blur-sm shadow-2xl">
+        <div className="overflow-y-auto flex-1 custom-scrollbar">
+          <table className="w-full text-left min-w-[600px] border-collapse">
+            <thead className="sticky top-0 z-20 bg-[#111827]">
+              <tr className="border-b border-white/5 shadow-sm">
+                <th className="p-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Student Details</th>
+                <th className="p-6 text-right text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {filteredStudents.map((s) => (
+                <tr key={s.id} className="group hover:bg-white/[0.01] transition-colors">
+                  <td className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/10 flex items-center justify-center text-indigo-400 font-black text-xs uppercase">
+                        {s.firstName[0]}{s.lastName[0]}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="font-black text-slate-200 uppercase italic text-sm">{s.firstName} {s.lastName}</span>
+                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{s.email}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="p-6 text-right">
+                    <div className="flex items-center justify-end gap-3">
+                      <button onClick={() => setResetConfirmModal({ show: true, student: s })} className="px-4 py-2 bg-slate-800 text-slate-400 rounded-lg text-[9px] font-black uppercase tracking-widest cursor-pointer hover:bg-indigo-600 hover:text-white transition-all">Reset Password</button>
+                      <button onClick={() => setConfirmModal({ show: true, id: s.id, name: `${s.firstName} ${s.lastName}` })} className="p-3 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all cursor-pointer">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filteredStudents.length === 0 && (
+                <tr>
+                  <td colSpan="2" className="p-20 text-center text-[10px] font-black text-slate-600 uppercase tracking-widest italic">
+                    No results found in directory.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Modals & Toasts */}
+      {globalVoteResetModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-[300] bg-slate-950/90 backdrop-blur-md p-4 text-center">
+          <div className="bg-slate-900 border border-emerald-500/20 rounded-[2.5rem] p-10 max-w-sm w-full shadow-2xl">
+            <h3 className="text-xl font-black text-white uppercase italic mb-2">Mass Reset?</h3>
+            <p className="text-slate-500 text-[10px] mb-8 font-bold uppercase tracking-widest">Wipe evaluation status for all students?</p>
+            <div className="grid grid-cols-2 gap-4">
+              <button onClick={() => setGlobalVoteResetModal(false)} className="py-4 bg-slate-800 text-slate-300 rounded-2xl font-black text-[10px] uppercase cursor-pointer">No</button>
+              <button onClick={executeGlobalVoteReset} className="py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase cursor-pointer">Confirm</button>
+            </div>
           </div>
         </div>
       )}
 
-      {errorModal.show && (
-        <div className="fixed inset-0 flex items-center justify-center z-[300] bg-slate-950/80 backdrop-blur-md p-4">
-          <div className="bg-slate-900 border border-rose-500/20 rounded-[2rem] p-8 w-full max-w-sm text-center animate-center-pop">
-            <h3 className="text-white font-black uppercase mb-2">Attention</h3>
-            <p className="text-slate-400 text-sm mb-6">{errorModal.message}</p>
-            <button onClick={() => setErrorModal({ show: false, message: '' })} className="cursor-pointer w-full py-4 bg-slate-800 text-white rounded-2xl font-bold text-[10px] uppercase tracking-widest">Acknowledge</button>
+      {generatedPassword && (
+        <div className="fixed inset-0 flex items-center justify-center z-[400] bg-slate-950/95 backdrop-blur-xl p-4 text-center">
+          <div className="bg-slate-900 border border-indigo-500/30 rounded-[2.5rem] p-10 w-full max-w-sm shadow-2xl">
+            <h3 className="text-xl font-black text-white uppercase mb-8 italic text-indigo-400">Temporary Password</h3>
+            <div className="bg-slate-950 border border-white/5 rounded-2xl p-6 mb-8 flex flex-col items-center gap-4">
+              <span className="text-2xl font-black text-white tracking-widest font-mono">{generatedPassword}</span>
+              <button onClick={handleCopy} className="cursor-pointer text-[9px] font-black uppercase tracking-widest px-6 py-2 bg-indigo-600/10 border border-indigo-500/20 rounded-lg text-indigo-400">
+                {copied ? "Copied!" : "Copy Password"}
+              </button>
+            </div>
+            <button onClick={() => setGeneratedPassword('')} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest cursor-pointer">Close</button>
           </div>
         </div>
       )}
 
       {resetConfirmModal.show && (
-        <div className="fixed inset-0 flex items-center justify-center z-[260] bg-slate-950/90 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-indigo-500/20 rounded-[2.5rem] p-8 w-full max-w-sm shadow-2xl animate-center-pop">
-            <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2">Reset Password?</h3>
-            <p className="text-slate-400 text-sm mb-6">This will generate a new temporary password for <span className="text-indigo-400 font-bold">{resetConfirmModal.student?.firstName}</span>.</p>
-            <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => setResetConfirmModal({ show: false, student: null })} className="cursor-pointer py-4 bg-slate-800 text-slate-400 rounded-2xl font-bold text-[10px] uppercase tracking-widest">Cancel</button>
-              <button onClick={executePasswordReset} className="cursor-pointer py-4 bg-indigo-600 text-white rounded-2xl font-bold text-[10px] uppercase tracking-widest active:scale-95 transition-all">Confirm</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {passwordModal.show && (
-        <div className="fixed inset-0 flex items-center justify-center z-[270] bg-slate-950/95 p-4">
-          <div className="bg-slate-900 border border-indigo-500/30 rounded-[2.5rem] p-8 w-full max-w-sm text-center animate-center-pop">
-            <h3 className="text-xl font-black text-white uppercase mb-2">New Password</h3>
-            <div className="bg-slate-950 p-4 rounded-2xl my-6 font-mono text-indigo-400 font-bold border border-white/5 break-all select-all text-lg tracking-widest">
-              {passwordModal.password}
-            </div>
-            <button 
-              onClick={() => {
-                copyToClipboard(passwordModal.password);
-                setPasswordModal({ show: false, password: '', name: '' });
-              }} 
-              className="cursor-pointer w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:bg-indigo-500 active:scale-95 transition-all"
-            >
-              Copy & Close
-            </button>
+        <div className="fixed inset-0 flex items-center justify-center z-[350] bg-slate-950/90 backdrop-blur-md p-4 text-center">
+          <div className="bg-slate-900 border border-indigo-500/20 rounded-[2.5rem] p-10 max-w-sm w-full shadow-2xl">
+              <h3 className="text-xl font-black text-white uppercase mb-2 italic">Reset Password?</h3>
+              <p className="text-slate-500 text-[10px] mb-8 font-bold uppercase tracking-widest">New credentials for {resetConfirmModal.student.firstName}?</p>
+              <div className="grid grid-cols-2 gap-4">
+                <button onClick={() => setResetConfirmModal({ show: false, student: null })} className="py-4 bg-slate-800 text-slate-300 rounded-2xl font-black text-[10px] uppercase cursor-pointer">Cancel</button>
+                <button onClick={executePasswordReset} className="py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase cursor-pointer">Generate</button>
+              </div>
           </div>
         </div>
       )}
 
       {confirmModal.show && (
-        <div className="fixed inset-0 flex items-center justify-center z-[260] bg-slate-950/95 p-4">
-          <div className="bg-slate-900 border border-rose-500/20 rounded-[2.5rem] p-8 w-full max-w-md animate-center-pop">
-            <h3 className="text-xl font-black text-white uppercase mb-1 text-rose-500">Confirm Revocation</h3>
-            <p className="text-slate-500 text-[10px] font-bold uppercase mb-4 tracking-widest">User: {confirmModal.name}</p>
-            <textarea 
-              value={deleteReason}
-              onChange={(e) => setDeleteReason(e.target.value)}
-              placeholder="Reason (Required for Audit)..."
-              className="w-full bg-slate-950 border border-white/5 rounded-2xl p-4 text-sm text-white outline-none focus:border-rose-500/50 min-h-[120px] mb-6 shadow-inner transition-colors"
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => setConfirmModal({ show: false })} className="cursor-pointer py-4 bg-slate-800 text-slate-400 rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:bg-slate-700 transition-all">Back</button>
-              <button disabled={isDeleting} onClick={handleDelete} className="cursor-pointer py-4 bg-rose-600 text-white rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:bg-rose-500 active:scale-95 transition-all">
-                {isDeleting ? "Revoking..." : "Confirm"}
-              </button>
-            </div>
+        <div className="fixed inset-0 flex items-center justify-center z-[350] bg-slate-950/90 backdrop-blur-md p-4 text-center">
+          <div className="bg-slate-900 border border-rose-500/20 rounded-[2.5rem] p-10 max-w-sm w-full shadow-2xl">
+              <h3 className="text-xl font-black text-white mb-2 uppercase italic">Revoke Access?</h3>
+              <input type="text" placeholder="REASON" value={deleteReason} onChange={(e) => setDeleteReason(e.target.value)} className="w-full bg-black/40 border border-white/5 rounded-2xl p-4 text-[10px] text-white my-6 outline-none font-bold uppercase tracking-widest"/>
+              <div className="grid grid-cols-2 gap-4">
+                <button onClick={() => setConfirmModal({ show: false, id: null, name: '' })} className="py-4 bg-slate-800 text-slate-300 rounded-2xl font-black text-[10px] uppercase cursor-pointer">No</button>
+                <button onClick={handleDelete} className="py-4 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase cursor-pointer">Confirm</button>
+              </div>
           </div>
         </div>
       )}
 
-      {selectedStudent && (
-        <div className="fixed inset-0 flex items-center justify-center z-[150] bg-slate-950/80 backdrop-blur-md p-4" onClick={() => setSelectedStudent(null)}>
-          <div className="bg-slate-900 border border-white/10 rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl animate-center-pop" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-start mb-8">
-              <h3 className="text-2xl font-black text-white uppercase tracking-tighter italic">Manage Student</h3>
-              <button onClick={() => setSelectedStudent(null)} className="cursor-pointer text-slate-500 hover:text-white p-2 text-2xl transition-colors">×</button>
-            </div>
-            <div className="bg-slate-950/50 rounded-2xl p-6 mb-8 border border-white/5">
-              <p className="text-white font-bold text-lg">{selectedStudent.firstName} {selectedStudent.lastName}</p>
-              <p className="text-slate-500 text-xs font-medium">{selectedStudent.email}</p>
-            </div>
-            <div className="flex flex-col gap-3">
-              <button 
-                onClick={() => setResetConfirmModal({ show: true, student: selectedStudent })}
-                className="cursor-pointer w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:bg-indigo-500 transition-all active:scale-95"
-              >
-                Generate New Password
-              </button>
-              <button 
-                onClick={() => setConfirmModal({ show: true, id: selectedStudent.id, name: `${selectedStudent.firstName} ${selectedStudent.lastName}` })}
-                className="cursor-pointer w-full py-4 bg-rose-600/10 text-rose-500 border border-rose-500/20 rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:bg-rose-600/20 transition-all active:scale-95"
-              >
-                Revoke System Access
-              </button>
-            </div>
-          </div>
+      {toast.show && (
+        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[500] bg-indigo-600 text-white px-8 py-4 rounded-2xl shadow-2xl">
+           <span className="text-[10px] font-black uppercase tracking-widest">{toast.message}</span>
         </div>
       )}
-
-      {/* --- MAIN PAGE CONTENT --- */}
-      <div className={`max-w-6xl mx-auto transition-all duration-300 ${selectedStudent || confirmModal.show || globalVoteResetModal ? 'blur-md opacity-40 scale-[0.98]' : ''}`}>
-        <div className="flex flex-col gap-6 mb-10">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <button onClick={() => router.back()} className="cursor-pointer text-indigo-400 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 mb-2 group">
-                <span className="group-hover:-translate-x-1 transition-transform">←</span> Dashboard
-              </button>
-              <h1 className="text-3xl sm:text-4xl font-black text-white uppercase tracking-tighter">Student<span className="text-indigo-500">Directory</span></h1>
-            </div>
-            <button 
-              onClick={() => setGlobalVoteResetModal(true)}
-              className="cursor-pointer px-6 py-3 bg-emerald-600/10 hover:bg-emerald-600/20 border border-emerald-500/20 rounded-2xl text-[9px] font-black text-emerald-500 uppercase tracking-widest transition-all active:scale-95"
-            >
-              Reset All Voting Status
-            </button>
-          </div>
-          <div className="relative group">
-            <input 
-              type="text" 
-              placeholder="Search by Name or Email..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-slate-900 border border-white/5 p-4 pl-12 rounded-2xl outline-none text-white text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/30 transition-all"
-            />
-            <svg className="w-5 h-5 text-slate-600 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-indigo-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-          </div>
-        </div>
-
-        {/* Desktop List */}
-        <div className="hidden md:block bg-slate-900/50 rounded-[2.5rem] border border-white/5 overflow-hidden shadow-2xl backdrop-blur-sm">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-white/5 border-b border-white/10 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                <th className="p-6">Student Information</th>
-                <th className="p-6 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {filteredStudents.length === 0 && (
-                <tr>
-                  <td colSpan="2" className="p-12 text-center text-slate-600 text-xs font-black uppercase tracking-[0.2em]">No Matches Found</td>
-                </tr>
-              )}
-              {filteredStudents.map((s) => (
-                <tr key={s.id} onClick={() => setSelectedStudent(s)} className="hover:bg-indigo-500/5 transition-all group cursor-pointer">
-                  <td className="p-6">
-                    <p className="font-bold text-white text-sm">{s.firstName} {s.lastName}</p>
-                    <p className="text-[11px] text-slate-500 font-medium">{s.email}</p>
-                  </td>
-                  <td className="p-6 text-right">
-                    <span className="text-[10px] font-black uppercase text-indigo-500 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0 inline-block">Manage User →</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile Cards */}
-        <div className="md:hidden flex flex-col gap-4">
-          {filteredStudents.map((s) => (
-            <div key={s.id} onClick={() => setSelectedStudent(s)} className="cursor-pointer bg-slate-900 border border-white/5 p-5 rounded-[2rem] shadow-lg flex items-center justify-between active:scale-[0.98] transition-all">
-              <div>
-                <p className="font-bold text-white text-sm">{s.firstName} {s.lastName}</p>
-                <p className="text-[10px] text-slate-500 font-medium">{s.email}</p>
-              </div>
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/5 flex items-center justify-center">
-                <span className="text-indigo-500 font-bold">→</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
 
       <style jsx>{`
-        @keyframes center-pop {
-          0% { transform: scale(0.95); opacity: 0; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        .animate-center-pop {
-          animation: center-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.2); border-radius: 20px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.4); }
       `}</style>
     </div>
   )

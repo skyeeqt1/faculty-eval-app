@@ -1,7 +1,7 @@
 'use client'
 import { useRouter } from 'next/navigation'
 import { auth, db } from '../../lib/firebase' 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react' // Added useCallback
 import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { doc, onSnapshot, getDoc } from 'firebase/firestore'
 
@@ -11,7 +11,25 @@ export default function StudentPage() {
   const [loading, setLoading] = useState(true)
   const [isFormOpen, setIsFormOpen] = useState(true)
   const [yearLevel, setYearLevel] = useState('')
+  const [showLogoutModal, setShowLogoutModal] = useState(false)
 
+  // --- BACK BUTTON INTERCEPTION LOGIC ---
+  const handlePopState = useCallback((e) => {
+    // When the user hits the physical back button, show the modal
+    setShowLogoutModal(true);
+    // Push the state back immediately so the browser doesn't actually leave the page
+    window.history.pushState(null, null, window.location.pathname);
+  }, []);
+
+  useEffect(() => {
+    // Prime the history stack so there is a "previous" state to trap
+    window.history.pushState(null, null, window.location.pathname);
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [handlePopState]);
+
+  // --- AUTH & DATA LOGIC ---
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -85,12 +103,51 @@ export default function StudentPage() {
   return (
     <div className="min-h-screen bg-[#0f172a] flex flex-col items-center p-6 md:p-12 font-sans text-slate-200 relative overflow-hidden">
       
-      {/* Background Glows - Updated to Indigo/Violet */}
+      {/* --- LOGOUT CONFIRMATION MODAL --- */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+          <div 
+            className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+            onClick={() => setShowLogoutModal(false)}
+          />
+          
+          <div className="relative bg-[#111827] border border-white/10 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-rose-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-rose-500/20">
+                <svg className="w-8 h-8 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-black text-white uppercase italic tracking-tight mb-2">End Session?</h3>
+              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest leading-relaxed mb-8">
+                Are you sure you want to sign out of the student portal?
+              </p>
+              
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={handleLogout}
+                  className="cursor-pointer w-full py-4 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95"
+                >
+                  Yes, Sign Out
+                </button>
+                <button 
+                  onClick={() => setShowLogoutModal(false)}
+                  className="cursor-pointer w-full py-4 bg-slate-800 text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Background Glows */}
       <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-indigo-600/5 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-violet-600/5 blur-[120px] pointer-events-none" />
 
-      {/* Header */}
-      <div className="w-full max-w-5xl flex flex-col md:flex-row justify-between items-start md:items-center mb-12 mt-4 gap-6 z-10">
+      {/* Header Content */}
+      <div className={`w-full max-w-5xl flex flex-col md:flex-row justify-between items-start md:items-center mb-12 mt-4 gap-6 z-10 transition-all duration-300 ${showLogoutModal ? 'blur-md scale-[0.98]' : ''}`}>
         <div>
           <h1 className="text-3xl md:text-4xl font-black text-white tracking-tighter uppercase italic">
             Hello, <span className="text-indigo-500">{userName}</span>
@@ -101,15 +158,27 @@ export default function StudentPage() {
           </div>
         </div>
 
-        <button onClick={handleLogout} className="cursor-pointer flex items-center gap-3 px-6 py-3 bg-slate-900 border border-white/10 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-rose-400 hover:border-rose-500/30 transition-all active:scale-95">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-          Sign Out
-        </button>
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="flex md:hidden items-center gap-3 px-4 py-3 bg-slate-900/50 border border-white/5 rounded-2xl flex-1 justify-center">
+            <div className={`w-2 h-2 rounded-full ${isFormOpen ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500'}`}></div>
+            <span className="text-[9px] font-black text-white uppercase tracking-widest">
+              {isFormOpen ? "Opened" : "Closed"}
+            </span>
+          </div>
+
+          <button 
+            onClick={() => setShowLogoutModal(true)} 
+            className="cursor-pointer flex items-center gap-3 px-6 py-3 bg-slate-900 border border-white/10 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-rose-400 hover:border-rose-500/30 transition-all active:scale-95 flex-1 md:flex-none justify-center"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+            <span className="md:inline">Sign Out</span>
+          </button>
+        </div>
       </div>
 
-      <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 z-10">
+      <div className={`w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 z-10 transition-all duration-300 ${showLogoutModal ? 'blur-md scale-[0.98]' : ''}`}>
         <div className="lg:col-span-8 space-y-8">
-          {/* Step 1: Year Level - Updated to Indigo */}
+          {/* Step 1: Year Level */}
           <div className="bg-slate-900 rounded-[2.5rem] border border-white/5 p-8 md:p-10 shadow-2xl">
             <h3 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
                 <span className="w-6 h-6 rounded-lg bg-indigo-500/10 flex items-center justify-center text-[10px]">01</span>
@@ -132,7 +201,7 @@ export default function StudentPage() {
             </div>
           </div>
 
-          {/* Step 2: Evaluation Button - Updated to Indigo */}
+          {/* Step 2: Evaluation Button */}
           <div className="bg-slate-900 rounded-[2.5rem] border border-white/5 p-8 md:p-10 shadow-2xl relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/5 blur-3xl group-hover:bg-indigo-600/10 transition-colors" />
             
@@ -163,7 +232,7 @@ export default function StudentPage() {
 
         {/* Sidebar info */}
         <div className="lg:col-span-4 space-y-6">
-          <div className="bg-slate-900 rounded-[2rem] border border-white/5 p-8 shadow-2xl">
+          <div className="hidden md:block bg-slate-900 rounded-[2rem] border border-white/5 p-8 shadow-2xl">
             <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-6">Gateway Status</h3>
             <div className="flex items-center gap-4 bg-slate-950/50 p-4 rounded-2xl border border-white/5">
               <div className={`w-3 h-3 rounded-full ${isFormOpen ? 'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.5)] animate-pulse' : 'bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.5)]'}`}></div>

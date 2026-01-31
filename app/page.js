@@ -67,6 +67,18 @@ export default function LoginPage() {
         const studentData = studentDoc.data()
 
         if (studentData.password === password) {
+          // --- NEW: CHECK FOR FORCE PASSWORD CHANGE FLAG ---
+          if (studentData.mustChangePassword === true) {
+            setPopup({ 
+              show: true, 
+              message: "Security Notice: Password reset required before accessing dashboard.", 
+              isSuccess: true 
+            })
+            // Pass the student ID or email to the next page via query or state if needed
+            setTimeout(() => router.push(`/ChangePassword?id=${studentDoc.id}`), 2000)
+            return;
+          }
+
           localStorage.setItem("studentSession", JSON.stringify({
             email: studentData.email,
             firstName: studentData.firstName,
@@ -108,9 +120,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f172a] flex items-center justify-center px-4 relative overflow-hidden font-sans">
+    <div className="min-h-screen bg-[#0f172a] flex items-center justify-center px-4 relative overflow-hidden font-sans pt-safe">
       
-      {/* Background Decorative Elements - Changed to Indigo/Violet */}
+      {/* Background Decorative Elements */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-600/10 blur-[120px]" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-violet-600/10 blur-[120px]" />
       
@@ -148,7 +160,6 @@ export default function LoginPage() {
       {/* --- LOGIN CARD --- */}
       <div className={`bg-slate-900 w-full max-w-md p-8 md:p-12 rounded-[2.5rem] shadow-2xl border border-white/5 transition-all duration-500 ${popup.show ? 'blur-md opacity-50 scale-95' : 'opacity-100'}`}>
         <div className="text-center mb-10">
-            {/* Badge updated to Indigo */}
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-[11px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
               Security Protocol
@@ -199,9 +210,9 @@ export default function LoginPage() {
         </form>
         
         <div className="mt-10 pt-6 border-t border-white/5">
-           <p className="text-center text-slate-700 text-[9px] font-bold uppercase tracking-[0.4em]">
-             Authorized Personnel Only
-           </p>
+            <p className="text-center text-slate-700 text-[9px] font-bold uppercase tracking-[0.4em]">
+              Authorized Personnel Only
+            </p>
         </div>
       </div>
 
