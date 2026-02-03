@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react' 
-import { signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth'
+import { signInWithEmailAndPassword, onAuthStateChanged, setPersistence, browserSessionPersistence } from 'firebase/auth'
 import { auth, db } from '../lib/firebase' 
 import { collection, query, where, getDocs } from 'firebase/firestore' 
 import { useRouter } from 'next/navigation'
@@ -13,17 +13,30 @@ export default function LoginPage() {
   const router = useRouter()
 
   useEffect(() => {
-    const savedStudent = localStorage.getItem("studentSession")
+    // 1. Check SESSION storage instead of local storage
+    const savedStudent = sessionStorage.getItem("studentSession")
     if (savedStudent) {
       router.replace('/StudentDashboard')
       return
     }
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user && user.email.toLowerCase() === "admintest@gmail.com") {
         router.replace('/AdminDashboard')
       }
     })
-    return () => unsubscribe() 
+
+    // 2. Optional: Explicitly clear on close (Extra security layer)
+    const handleClose = () => {
+       // This runs when the tab is closed or refreshed
+       // Note: sessionStorage handles this automatically for tab closes
+    }
+    window.addEventListener('beforeunload', handleClose)
+
+    return () => {
+      unsubscribe()
+      window.removeEventListener('beforeunload', handleClose)
+    }
   }, [router])
 
   const handleLogin = async (e) => {
@@ -35,7 +48,10 @@ export default function LoginPage() {
       // 1. Admin Logic (Firebase Auth)
       if (cleanEmail === "admintest@gmail.com") {
         try {
+          // Set persistence to SESSION for Firebase Auth
+          await setPersistence(auth, browserSessionPersistence)
           await signInWithEmailAndPassword(auth, cleanEmail, password)
+          
           setPopup({ 
             show: true, 
             message: "Administrative identity confirmed. Initializing session...", 
@@ -67,19 +83,18 @@ export default function LoginPage() {
         const studentData = studentDoc.data()
 
         if (studentData.password === password) {
-          // --- NEW: CHECK FOR FORCE PASSWORD CHANGE FLAG ---
           if (studentData.mustChangePassword === true) {
             setPopup({ 
               show: true, 
               message: "Security Notice: Password reset required before accessing dashboard.", 
               isSuccess: true 
             })
-            // Pass the student ID or email to the next page via query or state if needed
             setTimeout(() => router.push(`/ChangePassword?id=${studentDoc.id}`), 2000)
             return;
           }
 
-          localStorage.setItem("studentSession", JSON.stringify({
+          // CHANGED: Use sessionStorage instead of localStorage
+          sessionStorage.setItem("studentSession", JSON.stringify({
             email: studentData.email,
             firstName: studentData.firstName,
             lastName: studentData.lastName,
@@ -119,14 +134,14 @@ export default function LoginPage() {
     }
   }
 
+  // ... (Keep the rest of your JSX and CSS the same)
   return (
     <div className="min-h-screen bg-[#0f172a] flex items-center justify-center px-4 relative overflow-hidden font-sans pt-safe">
-      
       {/* Background Decorative Elements */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-600/10 blur-[120px]" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-violet-600/10 blur-[120px]" />
       
-      {/* --- POPUP MODAL --- */}
+      {/* POPUP MODAL */}
       {popup.show && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
           <div className="bg-slate-900 border border-white/10 w-full max-w-sm rounded-[2rem] p-8 shadow-2xl animate-pop-in relative overflow-hidden">
@@ -157,7 +172,7 @@ export default function LoginPage() {
         </div>
       )}
 
-      {/* --- LOGIN CARD --- */}
+      {/* LOGIN CARD */}
       <div className={`bg-slate-900 w-full max-w-md p-8 md:p-12 rounded-[2.5rem] shadow-2xl border border-white/5 transition-all duration-500 ${popup.show ? 'blur-md opacity-50 scale-95' : 'opacity-100'}`}>
         <div className="text-center mb-10">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-[11px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">
