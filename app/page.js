@@ -13,7 +13,7 @@ export default function LoginPage() {
   const router = useRouter()
 
   useEffect(() => {
-    // 1. Check SESSION storage instead of local storage
+    // 1. Check Session Storage
     const savedStudent = sessionStorage.getItem("studentSession")
     if (savedStudent) {
       router.replace('/StudentDashboard')
@@ -26,29 +26,42 @@ export default function LoginPage() {
       }
     })
 
-    // 2. Optional: Explicitly clear on close (Extra security layer)
-    const handleClose = () => {
-       // This runs when the tab is closed or refreshed
-       // Note: sessionStorage handles this automatically for tab closes
+    // 2. Real-time Offline Listener
+    const handleOffline = () => {
+      setPopup({ 
+        show: true, 
+        message: "Network Interrupted: Your device is currently offline. Please check your internet connection.", 
+        isSuccess: false 
+      })
     }
-    window.addEventListener('beforeunload', handleClose)
+    window.addEventListener('offline', handleOffline)
 
     return () => {
       unsubscribe()
-      window.removeEventListener('beforeunload', handleClose)
+      window.removeEventListener('offline', handleOffline)
     }
   }, [router])
 
   const handleLogin = async (e) => {
     e.preventDefault()
+    
+    // Immediate check before calling Firebase
+    if (!navigator.onLine) {
+      setPopup({ 
+        show: true, 
+        message: "No Internet Connection: Please enable your Wi-Fi or mobile data to log in.", 
+        isSuccess: false 
+      })
+      return
+    }
+
     setLoading(true)
     const cleanEmail = email.toLowerCase().trim()
 
     try {
-      // 1. Admin Logic (Firebase Auth)
+      // 1. Admin Logic
       if (cleanEmail === "admintest@gmail.com") {
         try {
-          // Set persistence to SESSION for Firebase Auth
           await setPersistence(auth, browserSessionPersistence)
           await signInWithEmailAndPassword(auth, cleanEmail, password)
           
@@ -60,6 +73,7 @@ export default function LoginPage() {
           setTimeout(() => router.push('/AdminDashboard'), 2000)
           return
         } catch (adminErr) {
+          if (adminErr.code === 'auth/network-request-failed') throw new Error('OFFLINE')
           setPopup({ 
             show: true, 
             message: "Authorization Failed: Admin security key is incorrect.", 
@@ -93,7 +107,6 @@ export default function LoginPage() {
             return;
           }
 
-          // CHANGED: Use sessionStorage instead of localStorage
           sessionStorage.setItem("studentSession", JSON.stringify({
             email: studentData.email,
             firstName: studentData.firstName,
@@ -124,17 +137,25 @@ export default function LoginPage() {
       }
     } catch (error) {
       console.error("Login Error:", error)
-      setPopup({ 
-        show: true, 
-        message: "System Error: Unable to connect to the security server.", 
-        isSuccess: false 
-      })
+      // Specific Network Error Handling
+      if (error.code === 'auth/network-request-failed' || error.message === 'OFFLINE' || !navigator.onLine) {
+        setPopup({ 
+          show: true, 
+          message: "No Internet Connection: Unable to reach the security server. Check your connection and try again.", 
+          isSuccess: false 
+        })
+      } else {
+        setPopup({ 
+          show: true, 
+          message: "System Error: Unable to connect to the security server.", 
+          isSuccess: false 
+        })
+      }
     } finally {
       setLoading(false)
     }
   }
 
-  // ... (Keep the rest of your JSX and CSS the same)
   return (
     <div className="min-h-screen bg-[#0f172a] flex items-center justify-center px-4 relative overflow-hidden font-sans pt-safe">
       {/* Background Decorative Elements */}
@@ -144,7 +165,7 @@ export default function LoginPage() {
       {/* POPUP MODAL */}
       {popup.show && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
-          <div className="bg-slate-900 border border-white/10 w-full max-w-sm rounded-[2rem] p-8 shadow-2xl animate-pop-in relative overflow-hidden">
+          <div className="bg-slate-900 border border-white/10 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl animate-pop-in relative overflow-hidden">
             <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 ${popup.isSuccess ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'}`}>
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {popup.isSuccess ? (
@@ -154,13 +175,18 @@ export default function LoginPage() {
                 )}
               </svg>
             </div>
-            <h2 className="text-xl font-bold text-center text-white mb-2 italic uppercase tracking-wider">
-              {popup.isSuccess ? 'Verified' : 'Access Denied'}
+            <h2 className="text-lg font-black text-center text-white mb-2 italic uppercase tracking-wider">
+              {popup.isSuccess ? 'Verified' : 'Notice'}
             </h2>
-            <p className="text-slate-400 text-center text-sm mb-6 leading-relaxed">{popup.message}</p>
+            <p className="text-slate-400 text-center text-xs md:text-sm mb-6 leading-relaxed font-medium">
+              {popup.message}
+            </p>
             {!popup.isSuccess && (
-              <button onClick={() => setPopup({ show: false, message: '', isSuccess: false })} className="cursor-pointer w-full bg-indigo-600 text-white font-bold py-3.5 rounded-xl hover:bg-indigo-500 transition-all active:scale-[0.98] uppercase text-[10px] tracking-widest">
-                Try Again
+              <button 
+                onClick={() => setPopup({ show: false, message: '', isSuccess: false })} 
+                className="cursor-pointer w-full bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-500 transition-all active:scale-[0.98] uppercase text-[10px] tracking-widest shadow-lg shadow-indigo-600/20"
+              >
+                Continue
               </button>
             )}
             {popup.isSuccess && (
@@ -175,14 +201,14 @@ export default function LoginPage() {
       {/* LOGIN CARD */}
       <div className={`bg-slate-900 w-full max-w-md p-8 md:p-12 rounded-[2.5rem] shadow-2xl border border-white/5 transition-all duration-500 ${popup.show ? 'blur-md opacity-50 scale-95' : 'opacity-100'}`}>
         <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-[11px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
-              Security Protocol
-            </div>
-            <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic leading-none">
-              Faculty <span className="text-indigo-500">Evaluation</span>
-            </h2>
-            <p className="text-slate-500 mt-3 text-[10px] font-bold uppercase tracking-[0.3em]">Access Portal</p>
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-[11px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
+            Security Protocol
+          </div>
+          <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic leading-none">
+            Faculty <span className="text-indigo-500">Evaluation</span>
+          </h2>
+          <p className="text-slate-500 mt-3 text-[10px] font-bold uppercase tracking-[0.3em]">Access Portal</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
@@ -193,7 +219,7 @@ export default function LoginPage() {
               required
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className="w-full bg-slate-800 p-4 rounded-xl border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none font-medium text-white transition-all placeholder:text-slate-600"
+              className="w-full bg-slate-800 p-4 rounded-2xl border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none font-bold text-white transition-all placeholder:text-slate-600 text-sm"
               placeholder="Username"
             />
           </div>
@@ -205,7 +231,7 @@ export default function LoginPage() {
               required
               value={password}
               onChange={e => setPassword(e.target.value)}
-              className="w-full bg-slate-800 p-4 rounded-xl border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none font-medium text-white transition-all placeholder:text-slate-600"
+              className="w-full bg-slate-800 p-4 rounded-2xl border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none font-bold text-white transition-all placeholder:text-slate-600 text-sm"
               placeholder="Password"
             />
           </div>
@@ -213,7 +239,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading || popup.isSuccess}
-            className="cursor-pointer w-full bg-indigo-600 text-white py-4 rounded-xl font-bold uppercase tracking-widest text-[10px] hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 active:scale-[0.98]"
+            className="cursor-pointer w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 active:scale-[0.98]"
           >
             {loading ? (
               <>
@@ -225,15 +251,15 @@ export default function LoginPage() {
         </form>
         
         <div className="mt-10 pt-6 border-t border-white/5">
-            <p className="text-center text-slate-700 text-[9px] font-bold uppercase tracking-[0.4em]">
-              Authorized Personnel Only
-            </p>
+          <p className="text-center text-slate-700 text-[9px] font-black uppercase tracking-[0.4em]">
+            Authorized Personnel Only
+          </p>
         </div>
       </div>
 
       <style jsx>{`
         @keyframes pop-in {
-          0% { transform: scale(0.98); opacity: 0; }
+          0% { transform: scale(0.95); opacity: 0; }
           100% { transform: scale(1); opacity: 1; }
         }
         @keyframes timer-progress {
@@ -241,7 +267,7 @@ export default function LoginPage() {
           100% { width: 0%; }
         }
         .animate-pop-in {
-          animation: pop-in 0.3s ease-out forwards;
+          animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
         .animate-timer-progress {
           animation: timer-progress 2s linear forwards;
