@@ -13,11 +13,11 @@ export default function LoginPage() {
   const router = useRouter()
 
   useEffect(() => {
-    // 1. Check Session Storage
+    // 1. Check Student Session FIRST to stop loop
     const savedStudent = sessionStorage.getItem("studentSession")
     if (savedStudent) {
       router.replace('/StudentDashboard')
-      return
+      return 
     }
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -26,16 +26,10 @@ export default function LoginPage() {
       }
     })
 
-    // 2. Real-time Offline Listener
     const handleOffline = () => {
-      setPopup({ 
-        show: true, 
-        message: "Network Interrupted: Your device is currently offline. Please check your internet connection.", 
-        isSuccess: false 
-      })
+      setPopup({ show: true, message: "Network Interrupted: Check connection.", isSuccess: false })
     }
     window.addEventListener('offline', handleOffline)
-
     return () => {
       unsubscribe()
       window.removeEventListener('offline', handleOffline)
@@ -44,14 +38,8 @@ export default function LoginPage() {
 
   const handleLogin = async (e) => {
     e.preventDefault()
-    
-    // Immediate check before calling Firebase
     if (!navigator.onLine) {
-      setPopup({ 
-        show: true, 
-        message: "No Internet Connection: Please enable your Wi-Fi or mobile data to log in.", 
-        isSuccess: false 
-      })
+      setPopup({ show: true, message: "No Internet Connection.", isSuccess: false })
       return
     }
 
@@ -59,37 +47,15 @@ export default function LoginPage() {
     const cleanEmail = email.toLowerCase().trim()
 
     try {
-      // 1. Admin Logic
       if (cleanEmail === "admintest@gmail.com") {
-        try {
-          await setPersistence(auth, browserSessionPersistence)
-          await signInWithEmailAndPassword(auth, cleanEmail, password)
-          
-          setPopup({ 
-            show: true, 
-            message: "Administrative identity confirmed. Initializing session...", 
-            isSuccess: true 
-          })
-          setTimeout(() => router.push('/AdminDashboard'), 2000)
-          return
-        } catch (adminErr) {
-          if (adminErr.code === 'auth/network-request-failed') throw new Error('OFFLINE')
-          setPopup({ 
-            show: true, 
-            message: "Authorization Failed: Admin security key is incorrect.", 
-            isSuccess: false 
-          })
-          setLoading(false)
-          return
-        }
+        await setPersistence(auth, browserSessionPersistence)
+        await signInWithEmailAndPassword(auth, cleanEmail, password)
+        setPopup({ show: true, message: "Admin identity confirmed...", isSuccess: true })
+        setTimeout(() => router.push('/AdminDashboard'), 2000)
+        return
       }
 
-      // 2. Student Logic
-      const studentQuery = query(
-        collection(db, "authorized_students"),
-        where("email", "==", cleanEmail)
-      )
-      
+      const studentQuery = query(collection(db, "authorized_students"), where("email", "==", cleanEmail))
       const querySnapshot = await getDocs(studentQuery)
 
       if (!querySnapshot.empty) {
@@ -97,72 +63,39 @@ export default function LoginPage() {
         const studentData = studentDoc.data()
 
         if (studentData.password === password) {
-          if (studentData.mustChangePassword === true) {
-            setPopup({ 
-              show: true, 
-              message: "Security Notice: Password reset required before accessing dashboard.", 
-              isSuccess: true 
-            })
-            setTimeout(() => router.push(`/ChangePassword?id=${studentDoc.id}`), 2000)
-            return;
+          if (studentData.mustChangePassword) {
+            router.push(`/ChangePassword?id=${studentDoc.id}`)
+            return
           }
 
+          // CONSISTENT STORAGE: sessionStorage
           sessionStorage.setItem("studentSession", JSON.stringify({
             email: studentData.email,
             firstName: studentData.firstName,
-            lastName: studentData.lastName,
-            role: 'student',
             id: studentDoc.id
           }))
 
-          setPopup({ 
-            show: true, 
-            message: "Identity verified. Redirecting to Evaluation Portal...", 
-            isSuccess: true 
-          })
-          setTimeout(() => router.push('/StudentDashboard'), 2000)
+          setPopup({ show: true, message: "Identity verified. Redirecting...", isSuccess: true })
+          setTimeout(() => router.replace('/StudentDashboard'), 1500)
         } else {
-          setPopup({ 
-            show: true, 
-            message: "Access Denied: The security password provided is incorrect.", 
-            isSuccess: false 
-          })
+          setPopup({ show: true, message: "Access Denied: Incorrect password.", isSuccess: false })
         }
       } else {
-        setPopup({ 
-          show: true, 
-          message: "Access Denied: This email is not registered in our student directory.", 
-          isSuccess: false 
-        })
+        setPopup({ show: true, message: "Access Denied: Email not registered.", isSuccess: false })
       }
     } catch (error) {
-      console.error("Login Error:", error)
-      // Specific Network Error Handling
-      if (error.code === 'auth/network-request-failed' || error.message === 'OFFLINE' || !navigator.onLine) {
-        setPopup({ 
-          show: true, 
-          message: "No Internet Connection: Unable to reach the security server. Check your connection and try again.", 
-          isSuccess: false 
-        })
-      } else {
-        setPopup({ 
-          show: true, 
-          message: "System Error: Unable to connect to the security server.", 
-          isSuccess: false 
-        })
-      }
+      setPopup({ show: true, message: "System Error: Unable to connect.", isSuccess: false })
     } finally {
       setLoading(false)
     }
   }
 
+  // ... (Keep your existing return JSX and Styles)
   return (
     <div className="min-h-screen bg-[#0f172a] flex items-center justify-center px-4 relative overflow-hidden font-sans pt-safe">
-      {/* Background Decorative Elements */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-600/10 blur-[120px]" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-violet-600/10 blur-[120px]" />
       
-      {/* POPUP MODAL */}
       {popup.show && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
           <div className="bg-slate-900 border border-white/10 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl animate-pop-in relative overflow-hidden">
@@ -175,30 +108,15 @@ export default function LoginPage() {
                 )}
               </svg>
             </div>
-            <h2 className="text-lg font-black text-center text-white mb-2 italic uppercase tracking-wider">
-              {popup.isSuccess ? 'Verified' : 'Notice'}
-            </h2>
-            <p className="text-slate-400 text-center text-xs md:text-sm mb-6 leading-relaxed font-medium">
-              {popup.message}
-            </p>
+            <h2 className="text-lg font-black text-center text-white mb-2 italic uppercase tracking-wider">{popup.isSuccess ? 'Verified' : 'Notice'}</h2>
+            <p className="text-slate-400 text-center text-xs md:text-sm mb-6 leading-relaxed font-medium">{popup.message}</p>
             {!popup.isSuccess && (
-              <button 
-                onClick={() => setPopup({ show: false, message: '', isSuccess: false })} 
-                className="cursor-pointer w-full bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-500 transition-all active:scale-[0.98] uppercase text-[10px] tracking-widest shadow-lg shadow-indigo-600/20"
-              >
-                Continue
-              </button>
-            )}
-            {popup.isSuccess && (
-              <div className="absolute bottom-0 left-0 h-1 bg-white/5 w-full">
-                <div className="h-full bg-emerald-500 animate-timer-progress"></div>
-              </div>
+              <button onClick={() => setPopup({ show: false, message: '', isSuccess: false })} className="cursor-pointer w-full bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-500 transition-all uppercase text-[10px] tracking-widest shadow-lg shadow-indigo-600/20">Continue</button>
             )}
           </div>
         </div>
       )}
 
-      {/* LOGIN CARD */}
       <div className={`bg-slate-900 w-full max-w-md p-8 md:p-12 rounded-[2.5rem] shadow-2xl border border-white/5 transition-all duration-500 ${popup.show ? 'blur-md opacity-50 scale-95' : 'opacity-100'}`}>
         <div className="text-center mb-10">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-[11px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">
@@ -214,64 +132,21 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className="space-y-6">
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Academic Email</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              className="w-full bg-slate-800 p-4 rounded-2xl border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none font-bold text-white transition-all placeholder:text-slate-600 text-sm"
-              placeholder="Username"
-            />
+            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-slate-800 p-4 rounded-2xl border border-slate-700 focus:border-indigo-500 text-white outline-none text-sm" placeholder="Username" />
           </div>
-
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Security Password</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="w-full bg-slate-800 p-4 rounded-2xl border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none font-bold text-white transition-all placeholder:text-slate-600 text-sm"
-              placeholder="Password"
-            />
+            <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-slate-800 p-4 rounded-2xl border border-slate-700 focus:border-indigo-500 text-white outline-none text-sm" placeholder="Password" />
           </div>
-
-          <button
-            type="submit"
-            disabled={loading || popup.isSuccess}
-            className="cursor-pointer w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 active:scale-[0.98]"
-          >
-            {loading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                Verifying...
-              </>
-            ) : "Enter Portal"}
+          <button type="submit" disabled={loading} className="cursor-pointer w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-indigo-500 transition-all flex items-center justify-center gap-2">
+            {loading ? "Verifying..." : "Enter Portal"}
           </button>
         </form>
-        
-        <div className="mt-10 pt-6 border-t border-white/5">
-          <p className="text-center text-slate-700 text-[9px] font-black uppercase tracking-[0.4em]">
-            Authorized Personnel Only
-          </p>
-        </div>
       </div>
 
       <style jsx>{`
-        @keyframes pop-in {
-          0% { transform: scale(0.95); opacity: 0; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-        @keyframes timer-progress {
-          0% { width: 100%; }
-          100% { width: 0%; }
-        }
-        .animate-pop-in {
-          animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-        }
-        .animate-timer-progress {
-          animation: timer-progress 2s linear forwards;
-        }
+        @keyframes pop-in { 0% { transform: scale(0.95); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .animate-pop-in { animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
       `}</style>
     </div>
   )
