@@ -93,7 +93,7 @@ export default function AdminLayout({ children }) {
       {/* Persistent Sidebar */}
       <aside className={`fixed inset-y-0 left-0 z-[70] w-72 bg-slate-900 border-r border-white/5 flex flex-col md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-200 md:transition-none`}>
         <div className="p-8 pr-4 flex items-center justify-between">
-          <h1 className="text-2xl font-black tracking-tighter text-white uppercase italic">ADMIN<span className="text-indigo-500">ROOT</span></h1>
+          <h1 className="text-2xl font-black tracking-tighter text-white uppercase italic">ADMIN<span className="text-indigo-500">Panel</span></h1>
           <button onClick={() => handleSidebarToggle(false)} className="md:hidden p-3 bg-white/5 rounded-xl text-slate-400 hover:text-white transition-all active:scale-90">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
