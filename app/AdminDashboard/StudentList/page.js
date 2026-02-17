@@ -142,10 +142,10 @@ export default function StudentListPage() {
   )
 
   return (
-    <div className="p-4 md:p-8 lg:p-12 max-w-6xl mx-auto w-full h-screen flex flex-col space-y-8 overflow-hidden">
+    <div className="p-4 md:p-8 lg:p-12 max-w-6xl mx-auto w-full h-screen flex flex-col space-y-6 md:space-y-8 overflow-hidden">
       
-      {/* Header Section - Matched with Faculty Management */}
-      <div className="shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-6">
+      {/* DESKTOP HEADER - Hidden on Mobile */}
+      <div className="hidden md:flex shrink-0 items-center justify-between gap-6">
         <div>
           <h2 className="text-2xl font-black text-white uppercase italic tracking-tight">Student Directory</h2>
           <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-1">Total Authorized: {students.length}</p>
@@ -160,11 +160,21 @@ export default function StudentListPage() {
         </div>
       </div>
 
-      {/* Registration Form - Matched with Faculty Form UI */}
+      {/* MOBILE ACTION BUTTONS - Only visible on small screens */}
+      <div className="flex md:hidden shrink-0 gap-2">
+         <button onClick={() => setIsAddFormOpen(!isAddFormOpen)} className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest">
+            {isAddFormOpen ? 'Cancel' : 'Add Student'}
+         </button>
+         <button onClick={() => setGlobalVoteResetModal(true)} className="px-6 py-4 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-2xl font-black text-[10px] uppercase">
+            Reset All
+         </button>
+      </div>
+
+      {/* Registration Form */}
       {isAddFormOpen && (
-        <section className="shrink-0 bg-slate-900/50 border border-indigo-500/20 p-6 md:p-8 rounded-[2rem] backdrop-blur-sm shadow-xl animate-in fade-in slide-in-from-top-4 duration-300">
-          <form onSubmit={handleAddStudent} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <section className="shrink-0 bg-slate-900/50 border border-indigo-500/20 p-6 rounded-[2rem] backdrop-blur-sm shadow-xl animate-in fade-in slide-in-from-top-4 duration-300">
+          <form onSubmit={handleAddStudent} className="space-y-4 md:space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
               <input type="text" placeholder="FIRST NAME" value={newStudent.firstName} onChange={(e) => setNewStudent({...newStudent, firstName: e.target.value})} className="bg-slate-800 border border-white/5 rounded-xl px-5 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white"/>
               <input type="text" placeholder="LAST NAME" value={newStudent.lastName} onChange={(e) => setNewStudent({...newStudent, lastName: e.target.value})} className="bg-slate-800 border border-white/5 rounded-xl px-5 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white"/>
               <input type="email" placeholder="EMAIL ADDRESS" value={newStudent.email} onChange={(e) => setNewStudent({...newStudent, email: e.target.value})} className="bg-slate-800 border border-white/5 rounded-xl px-5 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white"/>
@@ -183,13 +193,13 @@ export default function StudentListPage() {
       {/* Filter/Search */}
       <div className="shrink-0 relative group">
         <input 
-          type="text" placeholder="Search directory by name or email..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+          type="text" placeholder="Search directory..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full bg-slate-900/50 border border-white/5 p-5 rounded-2xl outline-none text-white text-xs font-bold uppercase tracking-widest focus:border-indigo-500/50 transition-all"
         />
       </div>
 
-      {/* List Table - Matched with Faculty Management UI */}
-      <section className="flex-1 min-h-0 bg-slate-900/50 border border-white/5 rounded-[2.5rem] overflow-hidden backdrop-blur-sm flex flex-col shadow-2xl">
+      {/* List Table */}
+      <section className="flex-1 min-h-0 bg-slate-900/50 border border-white/5 rounded-[2.5rem] overflow-hidden backdrop-blur-sm flex flex-col shadow-2xl mb-20 md:mb-0">
         <div className="overflow-y-auto custom-scrollbar flex-1">
           <table className="w-full text-left min-w-full border-collapse">
             <thead className="sticky top-0 z-10 bg-[#151c2e]">
@@ -207,7 +217,10 @@ export default function StudentListPage() {
                       <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/10 flex items-center justify-center text-indigo-400 font-black text-xs shrink-0">
                         {s.firstName[0]}{s.lastName[0]}
                       </div>
-                      <span className="font-black text-slate-200 uppercase italic text-sm group-hover:text-indigo-400 transition-colors truncate">{s.firstName} {s.lastName}</span>
+                      <div className="flex flex-col">
+                        <span className="font-black text-slate-200 uppercase italic text-sm group-hover:text-indigo-400 transition-colors truncate">{s.firstName} {s.lastName}</span>
+                        <span className="md:hidden text-[9px] text-slate-600 font-bold uppercase tracking-tighter mt-0.5">{s.email}</span>
+                      </div>
                     </div>
                   </td>
                   <td className="hidden md:table-cell p-6">
@@ -215,7 +228,7 @@ export default function StudentListPage() {
                   </td>
                   <td className="hidden lg:table-cell p-6 text-right">
                     <div className="flex items-center justify-end gap-3">
-                      <button onClick={(e) => { e.stopPropagation(); setResetConfirmModal({ show: true, student: s }) }} className="px-4 py-2 bg-slate-800 text-slate-400 rounded-lg text-[9px] font-black uppercase tracking-widest cursor-pointer hover:bg-indigo-600 hover:text-white transition-all">Reset Password</button>
+                      <button onClick={(e) => { e.stopPropagation(); setResetConfirmModal({ show: true, student: s }) }} className="px-4 py-2 bg-slate-800 text-slate-400 rounded-lg text-[9px] font-black uppercase tracking-widest cursor-pointer hover:bg-indigo-600 hover:text-white transition-all">Reset PWD</button>
                       <button onClick={(e) => { e.stopPropagation(); setConfirmModal({ show: true, id: s.id, name: `${s.firstName} ${s.lastName}` }) }} className="p-3 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all cursor-pointer">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
@@ -230,9 +243,9 @@ export default function StudentListPage() {
 
       {/* MOBILE ACTION DRAWER */}
       {activeStudent && (
-        <div className="fixed inset-0 z-[400] flex items-end justify-center lg:hidden">
+        <div className="fixed inset-0 z-[1500] flex items-end justify-center lg:hidden">
           <div className={`fixed inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity duration-500 ${isDrawerVisible ? 'opacity-100' : 'opacity-0'}`} onClick={handleCloseDrawer} />
-          <div className={`relative w-full bg-slate-900 border-t border-white/10 rounded-t-[3rem] p-8 pb-12 shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${isDrawerVisible ? 'translate-y-0' : 'translate-y-full'}`}>
+          <div className={`relative w-full bg-[#0f172a] border-t border-white/10 rounded-t-[3rem] p-8 pb-12 shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${isDrawerVisible ? 'translate-y-0' : 'translate-y-full'}`}>
             <div className="w-12 h-1.5 bg-slate-800 rounded-full mx-auto mb-8" />
             <div className="text-center mb-8">
               <h3 className="text-xl font-black text-white uppercase italic mb-1">{activeStudent.firstName} {activeStudent.lastName}</h3>
@@ -247,64 +260,64 @@ export default function StudentListPage() {
         </div>
       )}
 
-      {/* MODALS & TOASTS - Standardized with Faculty UI */}
+      {/* MODALS */}
       {globalVoteResetModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-[500] bg-slate-950/90 backdrop-blur-md p-4 text-center">
+        <div className="fixed inset-0 flex items-center justify-center z-[2000] bg-slate-950/90 backdrop-blur-md p-4 text-center">
           <div className="bg-slate-900 border border-white/10 rounded-[2.5rem] p-10 max-w-sm w-full shadow-2xl animate-in zoom-in duration-200">
             <h3 className="text-xl font-black text-white uppercase italic mb-2">Global Reset?</h3>
             <p className="text-slate-500 text-[10px] mb-8 font-bold uppercase tracking-widest leading-relaxed">Wipe all student evaluation statuses?</p>
             <div className="grid grid-cols-2 gap-4">
-              <button onClick={() => setGlobalVoteResetModal(false)} className="py-4 bg-slate-800 text-slate-300 rounded-2xl font-black text-[10px] uppercase hover:bg-slate-700 transition-colors cursor-pointer">Cancel</button>
-              <button onClick={executeGlobalVoteReset} className="py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-emerald-600/20 hover:bg-emerald-500 transition-colors cursor-pointer active:scale-95">Confirm</button>
+              <button onClick={() => setGlobalVoteResetModal(false)} className="py-4 bg-slate-800 text-slate-300 rounded-2xl font-black text-[10px] uppercase cursor-pointer">Cancel</button>
+              <button onClick={executeGlobalVoteReset} className="py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-emerald-600/20 cursor-pointer active:scale-95">Confirm</button>
             </div>
           </div>
         </div>
       )}
 
       {generatedPassword && (
-        <div className="fixed inset-0 flex items-center justify-center z-[600] bg-slate-950/95 backdrop-blur-xl p-4 text-center">
+        <div className="fixed inset-0 flex items-center justify-center z-[2100] bg-slate-950/95 backdrop-blur-xl p-4 text-center">
           <div className="bg-slate-900 border border-indigo-500/30 rounded-[2.5rem] p-10 w-full max-w-sm shadow-2xl animate-in zoom-in duration-200">
             <h3 className="text-xl font-black text-white uppercase mb-8 italic text-indigo-400">Temporary PWD</h3>
             <div className="bg-slate-950 border border-white/5 rounded-2xl p-6 mb-8 flex flex-col items-center gap-4">
               <span className="text-2xl font-black text-white tracking-widest font-mono">{generatedPassword}</span>
-              <button onClick={handleCopy} className="text-[9px] font-black uppercase tracking-widest px-6 py-2 bg-indigo-600/10 border border-indigo-500/20 rounded-lg text-indigo-400 hover:bg-indigo-600 hover:text-white transition-all cursor-pointer">
+              <button onClick={handleCopy} className="text-[9px] font-black uppercase tracking-widest px-6 py-2 bg-indigo-600/10 border border-indigo-500/20 rounded-lg text-indigo-400 active:bg-indigo-600 active:text-white transition-all cursor-pointer">
                 {copied ? "Copied!" : "Copy"}
               </button>
             </div>
-            <button onClick={() => setGeneratedPassword('')} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase hover:bg-indigo-500 transition-colors cursor-pointer active:scale-95">Close</button>
+            <button onClick={() => setGeneratedPassword('')} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase cursor-pointer active:scale-95">Close</button>
           </div>
         </div>
       )}
 
       {resetConfirmModal.show && (
-        <div className="fixed inset-0 flex items-center justify-center z-[550] bg-slate-950/90 backdrop-blur-md p-4 text-center">
+        <div className="fixed inset-0 flex items-center justify-center z-[2000] bg-slate-950/90 backdrop-blur-md p-4 text-center">
           <div className="bg-slate-900 border border-white/10 rounded-[2.5rem] p-10 max-w-sm w-full shadow-2xl animate-in zoom-in duration-200">
               <h3 className="text-xl font-black text-white uppercase mb-2 italic">Reset PWD?</h3>
               <p className="text-slate-500 text-[10px] mb-8 font-bold uppercase tracking-widest leading-relaxed">For {resetConfirmModal.student.firstName}?</p>
               <div className="grid grid-cols-2 gap-4">
-                <button onClick={() => setResetConfirmModal({ show: false, student: null })} className="py-4 bg-slate-800 text-slate-300 rounded-2xl font-black text-[10px] uppercase hover:bg-slate-700 transition-colors cursor-pointer">Cancel</button>
-                <button onClick={executePasswordReset} className="py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase hover:bg-indigo-500 transition-colors cursor-pointer active:scale-95">Generate</button>
+                <button onClick={() => setResetConfirmModal({ show: false, student: null })} className="py-4 bg-slate-800 text-slate-300 rounded-2xl font-black text-[10px] uppercase cursor-pointer">Cancel</button>
+                <button onClick={executePasswordReset} className="py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase cursor-pointer active:scale-95">Generate</button>
               </div>
           </div>
         </div>
       )}
 
       {confirmModal.show && (
-        <div className="fixed inset-0 flex items-center justify-center z-[550] bg-slate-950/90 backdrop-blur-md p-4 text-center">
+        <div className="fixed inset-0 flex items-center justify-center z-[2000] bg-slate-950/90 backdrop-blur-md p-4 text-center">
           <div className="bg-slate-900 border border-rose-500/20 rounded-[2.5rem] p-10 max-w-sm w-full shadow-2xl animate-in zoom-in duration-200">
               <h3 className="text-xl font-black text-white mb-2 uppercase italic">Revoke Access?</h3>
               <input type="text" placeholder="REASON" value={deleteReason} onChange={(e) => setDeleteReason(e.target.value)} className="w-full bg-black/40 border border-white/5 rounded-2xl p-4 text-[10px] text-white my-6 outline-none font-bold uppercase tracking-widest text-center focus:border-rose-500/50 transition-all"/>
               <div className="grid grid-cols-2 gap-4">
-                <button onClick={() => setConfirmModal({ show: false, id: null, name: '' })} className="py-4 bg-slate-800 text-slate-300 rounded-2xl font-black text-[10px] uppercase hover:bg-slate-700 transition-colors cursor-pointer">No</button>
-                <button onClick={handleDelete} className="py-4 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase hover:bg-rose-500 transition-colors cursor-pointer active:scale-95 shadow-lg shadow-rose-600/20">Confirm</button>
+                <button onClick={() => setConfirmModal({ show: false, id: null, name: '' })} className="py-4 bg-slate-800 text-slate-300 rounded-2xl font-black text-[10px] uppercase cursor-pointer">No</button>
+                <button onClick={handleDelete} className="py-4 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase cursor-pointer active:scale-95 shadow-lg shadow-rose-600/20">Confirm</button>
               </div>
           </div>
         </div>
       )}
 
       {toast.show && (
-        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[700] bg-indigo-600 text-white px-8 py-4 rounded-2xl shadow-2xl animate-in slide-in-from-top-full duration-300">
-           <span className="text-[10px] font-black uppercase tracking-widest">{toast.message}</span>
+        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[3000] bg-indigo-600 text-white px-8 py-4 rounded-2xl shadow-2xl animate-in slide-in-from-top-full duration-300">
+            <span className="text-[10px] font-black uppercase tracking-widest">{toast.message}</span>
         </div>
       )}
 

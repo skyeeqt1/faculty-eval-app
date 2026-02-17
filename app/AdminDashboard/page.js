@@ -12,11 +12,9 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchSettings()
-    
     const q = query(collection(db, "evaluations"))
     const unsubRanking = onSnapshot(q, (snapshot) => {
       const allEvals = snapshot.docs.map(doc => doc.data())
-      
       const grouped = allEvals.reduce((acc, curr) => {
         const name = curr.professorName || "Unknown"
         const rating = parseFloat(curr.rating) || 0
@@ -27,7 +25,6 @@ export default function AdminDashboard() {
         acc[name].count += 1
         return acc
       }, {})
-
       const sortedProfs = Object.values(grouped)
         .map((p) => ({
           id: p.name,
@@ -36,11 +33,9 @@ export default function AdminDashboard() {
           imageUrl: p.imageUrl
         }))
         .sort((a, b) => b.rating - a.rating)
-
       setRanking(sortedProfs)
       setLoading(false)
     })
-
     return () => unsubRanking()
   }, [])
 
@@ -73,15 +68,16 @@ export default function AdminDashboard() {
 
   return (
     <div className="p-4 md:p-12 max-w-6xl mx-auto w-full h-screen flex flex-col space-y-8 overflow-hidden">
-      {/* Header - Fixed */}
-      <div className="shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-6">
+      
+      {/* DESKTOP HEADER (Only visible on MD and larger) */}
+      <div className="hidden md:flex shrink-0 flex-col md:items-start justify-between gap-6">
         <div>
           <h2 className="text-2xl font-black text-white uppercase italic tracking-tight">Main Dashboard</h2>
           <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-1">System Overview & Performance</p>
         </div>
       </div>
 
-      {/* Portal Status Card - Fixed */}
+      {/* Portal Status Card */}
       <section className={`shrink-0 p-8 rounded-[2.5rem] border transition-all flex flex-col md:flex-row items-center justify-between gap-6 ${isFormOpen ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-slate-900 border-white/5'}`}>
         <div className="text-center md:text-left">
           <h2 className={`text-xl font-black uppercase italic ${isFormOpen ? 'text-emerald-500' : 'text-slate-300'}`}>System Status: {isFormOpen ? 'Live' : 'Offline'}</h2>
@@ -92,7 +88,7 @@ export default function AdminDashboard() {
         </button>
       </section>
 
-      {/* Ranking Section - Scrollable */}
+      {/* Ranking Section */}
       <section className="flex-1 flex flex-col min-h-0 space-y-4">
         <div className="shrink-0 flex items-center justify-between px-4">
           <h3 className="text-sm font-black text-slate-400 uppercase tracking-[0.3em] italic">Faculty Performance Overview</h3>
@@ -134,7 +130,7 @@ export default function AdminDashboard() {
         </div>
       </section>
 
-      {/* Confirmation Modal */}
+      {/* Confirmation Modal and Toast remains the same... */}
       {confirmModal.show && (
         <div className="fixed inset-0 flex items-center justify-center z-[300] bg-slate-950/90 backdrop-blur-md p-4 text-center">
           <div className="bg-slate-900 border border-white/5 rounded-[2.5rem] p-10 max-w-sm w-full shadow-2xl">
@@ -148,7 +144,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Toast Notification */}
       {toast.show && (
         <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[500] bg-indigo-600 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-3">
            <span className="text-[10px] font-black uppercase tracking-widest">{toast.message}</span>
