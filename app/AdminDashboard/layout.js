@@ -12,7 +12,6 @@ export default function AdminLayout({ children }) {
   const [toast, setToast] = useState({ show: false, message: '' })
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
-  // 1. Dynamic Title Helper (Updated for Logs)
   const getPageTitle = () => {
     const p = pathname.toLowerCase();
     if (p.includes('faculty')) return { main: "Faculty Management", sub: "Manage Instructors" };
@@ -23,7 +22,6 @@ export default function AdminLayout({ children }) {
     return { main: "Main Dashboard", sub: "Overview & Performance" };
   }
 
-  // 2. Navigation Handler
   const navigateTo = (path) => {
     router.push(path);
     if (window.innerWidth < 1024) {
@@ -31,7 +29,6 @@ export default function AdminLayout({ children }) {
     }
   };
 
-  // 3. Highlight Logic
   const isLinkActive = (path) => {
     const currentPath = pathname.toLowerCase();
     const targetPath = path.toLowerCase();
@@ -41,17 +38,11 @@ export default function AdminLayout({ children }) {
     return currentPath.includes(targetPath.split('/').pop().toLowerCase());
   };
 
-  const triggerToast = (msg) => {
-    setToast({ show: true, message: msg })
-    setTimeout(() => setToast({ show: false, message: '' }), 2500)
-  };
-
   const handleLogout = async () => {
     await signOut(auth);
     router.replace('/');
   };
 
-  // 4. Auth Guard
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user && user.email?.toLowerCase() === "admintest@gmail.com") {
@@ -89,55 +80,28 @@ export default function AdminLayout({ children }) {
         md:relative md:translate-x-0 
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        <div className="p-8 pr-4 flex items-center justify-between">
+        <div className="p-8 pr-4 flex items-center justify-between shrink-0">
           <h1 className="text-2xl font-black tracking-tighter text-white uppercase italic">ADMIN<span className="text-indigo-500">Panel</span></h1>
           <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-3 bg-white/5 rounded-xl text-slate-400">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
 
-        <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
-          <SidebarLink 
-            icon="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" 
-            label="Dashboard" 
-            active={isLinkActive('/AdminDashboard')} 
-            onClick={() => navigateTo('/AdminDashboard')} 
-          />
-          <SidebarLink 
-            icon="M16 7a4 4 0 11-8 0 4 4 0 018 0z" 
-            label="Faculty" 
-            active={isLinkActive('Faculty')} 
-            onClick={() => navigateTo('/AdminDashboard/Faculty')} 
-          />
-          <SidebarLink 
-            icon="M12 14l9-5-9-5-9 5 9 5z" 
-            label="Students" 
-            active={isLinkActive('StudentList')} 
-            onClick={() => navigateTo('/AdminDashboard/StudentList')} 
-          />
-          <SidebarLink 
-            icon="M12 6.253v13" 
-            label="Subjects" 
-            active={isLinkActive('Subjects')} 
-            onClick={() => navigateTo('/AdminDashboard/Subjects')} 
-          />
-          <SidebarLink 
-            icon="M9 19v-6" 
-            label="Results" 
-            active={isLinkActive('Results')} 
-            onClick={() => navigateTo('/AdminDashboard/Results')} 
-          />
-          {/* NEW LOGS LINK */}
-          <SidebarLink 
-            icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" 
-            label="Activity Logs" 
-            active={isLinkActive('Logs')} 
-            onClick={() => navigateTo('/AdminDashboard/Logs')} 
-          />
+        <nav className="flex-1 px-4 space-y-2 overflow-y-auto custom-scrollbar">
+          <SidebarLink icon="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" label="Dashboard" active={isLinkActive('/AdminDashboard')} onClick={() => navigateTo('/AdminDashboard')} />
+          <SidebarLink icon="M16 7a4 4 0 11-8 0 4 4 0 018 0z" label="Faculty" active={isLinkActive('Faculty')} onClick={() => navigateTo('/AdminDashboard/Faculty')} />
+          <SidebarLink icon="M12 14l9-5-9-5-9 5 9 5z" label="Students" active={isLinkActive('StudentList')} onClick={() => navigateTo('/AdminDashboard/StudentList')} />
+          <SidebarLink icon="M12 6.253v13" label="Subjects" active={isLinkActive('Subjects')} onClick={() => navigateTo('/AdminDashboard/Subjects')} />
+          <SidebarLink icon="M9 19v-6" label="Results" active={isLinkActive('Results')} onClick={() => navigateTo('/AdminDashboard/Results')} />
+          <SidebarLink icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" label="Activity Logs" active={isLinkActive('Logs')} onClick={() => navigateTo('/AdminDashboard/Logs')} />
         </nav>
 
-        <div className="p-4 border-t border-white/5">
-          <button onClick={() => setShowLogoutModal(true)} className="w-full px-4 py-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 rounded-xl font-black text-[9px] uppercase tracking-widest transition-colors cursor-pointer">
+        {/* LOGOUT CONTAINER - FIXED FOR MOBILE NAV BARS */}
+        <div className="p-4 border-t border-white/5 bg-slate-900 logout-container">
+          <button 
+            onClick={() => setShowLogoutModal(true)} 
+            className="w-full px-4 py-4 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 rounded-2xl font-black text-[9px] uppercase tracking-widest transition-all cursor-pointer active:scale-95 shadow-lg shadow-rose-500/5"
+          >
             Logout Session
           </button>
         </div>
@@ -163,7 +127,7 @@ export default function AdminLayout({ children }) {
         </div>
       </main>
 
-      {/* MODALS & TOASTS (Stay the same) */}
+      {/* LOGOUT MODAL */}
       {showLogoutModal && (
         <div className="fixed inset-0 flex items-center justify-center z-[2000] bg-slate-950/90 backdrop-blur-md p-4">
           <div className="bg-slate-900 border border-white/10 rounded-[2.5rem] p-8 max-sm:w-full max-w-sm shadow-2xl text-center">
@@ -171,11 +135,21 @@ export default function AdminLayout({ children }) {
             <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-8">Confirm to end your admin session</p>
             <div className="grid grid-cols-2 gap-4">
               <button onClick={() => setShowLogoutModal(false)} className="py-4 bg-slate-800 text-slate-300 rounded-2xl font-black text-[10px] uppercase cursor-pointer">No, Stay</button>
-              <button onClick={handleLogout} className="py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase cursor-pointer">Yes, Logout</button>
+              <button onClick={handleLogout} className="py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase cursor-pointer shadow-lg shadow-indigo-600/20 active:scale-95">Yes, Logout</button>
             </div>
           </div>
         </div>
       )}
+
+      <style jsx>{`
+        .logout-container {
+          /* This is the key fix for mobile navigation bars */
+          padding-bottom: calc(1rem + env(safe-area-inset-bottom, 1rem));
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.1); border-radius: 20px; }
+      `}</style>
     </div>
   )
 }

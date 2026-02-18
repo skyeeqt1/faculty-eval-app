@@ -118,8 +118,7 @@ export default function ActivityLogs() {
                 <tr>
                   <td colSpan="3" className="p-20 text-center">
                     <p className="text-slate-600 font-bold uppercase text-[10px] tracking-widest italic">
-                      No logs found in audit_logs collection
-                    </p>
+                      No logs found</p>
                   </td>
                 </tr>
               )}
