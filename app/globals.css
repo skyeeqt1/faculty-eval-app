@@ -12,7 +12,7 @@
 
  
 
-  /* Your existing colors - adjusted for the Indigo/Slate theme */
+  /* Color theme */
 
   --background: #0f172a;
 
@@ -62,7 +62,7 @@ body {
 
 
 
-/* Cleaner scrollbar for the student list */
+/* Custom scrollbar */
 
 .scrollbar-thin::-webkit-scrollbar {
 
@@ -80,7 +80,7 @@ body {
 
 
 
-/* Utility classes for specific components */
+/* Safe area padding */
 
 .pt-safe {
 

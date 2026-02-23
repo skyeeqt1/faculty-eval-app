@@ -89,7 +89,6 @@ export default function LoginPage() {
   }
 
   return (
-    // FIXED: Changed items-center to items-start on mobile and added pt-12 to move it up
     <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-start md:justify-center px-4 pt-12 md:pt-0 relative overflow-hidden font-sans">
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-600/10 blur-[120px]" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-violet-600/10 blur-[120px]" />
@@ -115,7 +114,6 @@ export default function LoginPage() {
         </div>
       )}
 
-      {/* FIXED: Removed overflow-hidden to allow for better mobile scrolling if needed, and adjusted margins */}
       <div className={`bg-slate-900 w-full max-w-md p-8 md:p-12 rounded-[2.5rem] shadow-2xl border border-white/5 transition-all duration-500 z-10 ${popup.show ? 'blur-md opacity-50 scale-95' : 'opacity-100'}`}>
         <div className="text-center mb-8 md:mb-10">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-[11px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">

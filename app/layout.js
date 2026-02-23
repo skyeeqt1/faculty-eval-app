@@ -10,7 +10,7 @@ export default function RootLayout({ children }) {
   const pathname = usePathname()
 
   useEffect(() => {
-    // 1. Status Bar Setup
+    // Status Bar Setup
     const setStatus = async () => {
       try {
         await StatusBar.setBackgroundColor({ color: '#0f172a' });
@@ -21,7 +21,7 @@ export default function RootLayout({ children }) {
   }, []);
 
   useEffect(() => {
-    // 2. Hardware Back Button Listener (Mobile)
+    // Hardware Back Button
     const setupListener = async () => {
       const backListener = await App.addListener('backButton', () => {
         if (pathname === '/' || pathname === '/login') {

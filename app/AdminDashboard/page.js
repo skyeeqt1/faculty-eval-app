@@ -130,7 +130,6 @@ export default function AdminDashboard() {
         </div>
       </section>
 
-      {/* Confirmation Modal and Toast remains the same... */}
       {confirmModal.show && (
         <div className="fixed inset-0 flex items-center justify-center z-[300] bg-slate-950/90 backdrop-blur-md p-4 text-center">
           <div className="bg-slate-900 border border-white/5 rounded-[2.5rem] p-10 max-w-sm w-full shadow-2xl">

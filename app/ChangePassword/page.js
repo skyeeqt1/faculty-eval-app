@@ -48,7 +48,6 @@ function ChangePasswordContent() {
       
       setTimeout(() => router.push('/'), 2000)
     } catch (error) {
-      // If you see "Missing or insufficient permissions", check the fix below
       setPopup({ show: true, message: "Update failed: " + error.message, isSuccess: false })
     } finally {
       setLoading(false)

@@ -71,7 +71,7 @@ function EvaluationContent() {
       try {
         const studentId = student.email.toLowerCase().trim();
         
-        // 1. Check if already evaluated
+    // Check if already evaluated
         const statusRef = doc(db, "submissionStatus", studentId)
         const statusSnap = await getDoc(statusRef)
         if (statusSnap.exists()) {
@@ -80,32 +80,30 @@ function EvaluationContent() {
           return
         }
 
-        // 2. Check form settings
+    // Check form settings
         const settingsRef = doc(db, "settings", "formConfig")
         const settingsSnap = await getDoc(settingsRef)
         if (settingsSnap.exists()) {
           setIsFormOpen(settingsSnap.data().isOpen)
         }
 
-        // 3. FETCH PROFESSORS (Fixed field name to assignedYears)
+        // FETCH PROFESSORS
         const cleanYear = decodeURIComponent(selectedYear).trim();
         
-        // CHANGED: Querying "assignedYears" instead of "yearLevels"
+        // Query assigned years
         const profQuery = query(
           collection(db, "professors"), 
           where("assignedYears", "array-contains", cleanYear) 
         )
         
         const querySnapshot = await getDocs(profQuery)
-        
-        console.log(`DEBUG: Searching assignedYears for "${cleanYear}". Found: ${querySnapshot.size}`);
 
         const profList = querySnapshot.docs.map(doc => {
           const data = doc.data();
           return {
             name: data.name,
             image: data.imageUrl || "",
-            subjects: data.subjects || [] // Ensure this field exists in your doc or it will be an empty list
+            subjects: data.subjects || []
           }
         })
 

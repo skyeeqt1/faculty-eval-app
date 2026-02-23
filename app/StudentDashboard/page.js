@@ -13,7 +13,7 @@ export default function StudentPage() {
   const [yearLevel, setYearLevel] = useState('')
   const [showLogoutModal, setShowLogoutModal] = useState(false)
 
-  // --- BACK BUTTON INTERCEPTION ---
+  // BACK BUTTON INTERCEPTION
   const handlePopState = useCallback((e) => {
     setShowLogoutModal(true);
     window.history.pushState(null, null, window.location.pathname);
@@ -25,9 +25,9 @@ export default function StudentPage() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [handlePopState]);
 
-  // --- AUTH & DATA LOGIC (FIXED LOOPING) ---
+  // AUTH & DATA LOGIC
   useEffect(() => {
-    // 1. CHECK SESSION STORAGE IMMEDIATELY
+    // Check session storage
     const savedSession = sessionStorage.getItem("studentSession")
     if (savedSession) {
       const data = JSON.parse(savedSession)
@@ -53,7 +53,7 @@ export default function StudentPage() {
         } catch (error) { console.error(error) }
         setLoading(false)
       } else {
-        // 2. ONLY REDIRECT TO LOGIN IF BOTH ARE MISSING
+        // Redirect to login if session is missing
         if (!sessionStorage.getItem("studentSession")) {
           router.replace('/')
         }
@@ -96,7 +96,7 @@ export default function StudentPage() {
   return (
     <div className="min-h-screen bg-[#0f172a] flex flex-col items-center p-6 md:p-12 font-sans text-slate-200 relative overflow-hidden">
       
-      {/* --- LOGOUT MODAL --- */}
+      {/* LOGOUT MODAL */}
       {showLogoutModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
           <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setShowLogoutModal(false)} />

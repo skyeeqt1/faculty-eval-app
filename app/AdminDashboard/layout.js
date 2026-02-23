@@ -96,7 +96,7 @@ export default function AdminLayout({ children }) {
           <SidebarLink icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" label="Activity Logs" active={isLinkActive('Logs')} onClick={() => navigateTo('/AdminDashboard/Logs')} />
         </nav>
 
-        {/* LOGOUT CONTAINER - FIXED FOR MOBILE NAV BARS */}
+        {/* LOGOUT CONTAINER */}
         <div className="p-4 border-t border-white/5 bg-slate-900 logout-container">
           <button 
             onClick={() => setShowLogoutModal(true)} 
@@ -142,10 +142,6 @@ export default function AdminLayout({ children }) {
       )}
 
       <style jsx>{`
-        .logout-container {
-          /* This is the key fix for mobile navigation bars */
-          padding-bottom: calc(1rem + env(safe-area-inset-bottom, 1rem));
-        }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.1); border-radius: 20px; }
