@@ -13,7 +13,6 @@ export default function LoginPage() {
   const router = useRouter()
 
   useEffect(() => {
-    // 1. Check Student Session FIRST to stop loop
     const savedStudent = sessionStorage.getItem("studentSession")
     if (savedStudent) {
       router.replace('/StudentDashboard')
@@ -68,7 +67,6 @@ export default function LoginPage() {
             return
           }
 
-          // CONSISTENT STORAGE: sessionStorage
           sessionStorage.setItem("studentSession", JSON.stringify({
             email: studentData.email,
             firstName: studentData.firstName,
@@ -90,9 +88,9 @@ export default function LoginPage() {
     }
   }
 
-  // ... (Keep your existing return JSX and Styles)
   return (
-    <div className="min-h-screen bg-[#0f172a] flex items-center justify-center px-4 relative overflow-hidden font-sans pt-safe">
+    // FIXED: Changed items-center to items-start on mobile and added pt-12 to move it up
+    <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-start md:justify-center px-4 pt-12 md:pt-0 relative overflow-hidden font-sans">
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-600/10 blur-[120px]" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-violet-600/10 blur-[120px]" />
       
@@ -117,8 +115,9 @@ export default function LoginPage() {
         </div>
       )}
 
-      <div className={`bg-slate-900 w-full max-w-md p-8 md:p-12 rounded-[2.5rem] shadow-2xl border border-white/5 transition-all duration-500 ${popup.show ? 'blur-md opacity-50 scale-95' : 'opacity-100'}`}>
-        <div className="text-center mb-10">
+      {/* FIXED: Removed overflow-hidden to allow for better mobile scrolling if needed, and adjusted margins */}
+      <div className={`bg-slate-900 w-full max-w-md p-8 md:p-12 rounded-[2.5rem] shadow-2xl border border-white/5 transition-all duration-500 z-10 ${popup.show ? 'blur-md opacity-50 scale-95' : 'opacity-100'}`}>
+        <div className="text-center mb-8 md:mb-10">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-[11px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
             Security Protocol
@@ -129,16 +128,16 @@ export default function LoginPage() {
           <p className="text-slate-500 mt-3 text-[10px] font-bold uppercase tracking-[0.3em]">Access Portal</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
+        <form onSubmit={handleLogin} className="space-y-5 md:space-y-6">
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Academic Email</label>
-            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-slate-800 p-4 rounded-2xl border border-slate-700 focus:border-indigo-500 text-white outline-none text-sm" placeholder="Username" />
+            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-slate-800 p-4 rounded-2xl border border-slate-700 focus:border-indigo-500 text-white outline-none text-sm transition-all" placeholder="Username" />
           </div>
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Security Password</label>
-            <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-slate-800 p-4 rounded-2xl border border-slate-700 focus:border-indigo-500 text-white outline-none text-sm" placeholder="Password" />
+            <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-slate-800 p-4 rounded-2xl border border-slate-700 focus:border-indigo-500 text-white outline-none text-sm transition-all" placeholder="Password" />
           </div>
-          <button type="submit" disabled={loading} className="cursor-pointer w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-indigo-500 transition-all flex items-center justify-center gap-2">
+          <button type="submit" disabled={loading} className="cursor-pointer w-full mt-4 bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-indigo-500 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/10">
             {loading ? "Verifying..." : "Enter Portal"}
           </button>
         </form>
@@ -147,6 +146,11 @@ export default function LoginPage() {
       <style jsx>{`
         @keyframes pop-in { 0% { transform: scale(0.95); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         .animate-pop-in { animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        
+        /* Ensures the background stays fixed on mobile even when keyboard pops up */
+        @media (max-width: 768px) {
+          .min-h-screen { min-height: -webkit-fill-available; }
+        }
       `}</style>
     </div>
   )

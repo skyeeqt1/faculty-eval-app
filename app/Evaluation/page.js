@@ -70,33 +70,44 @@ function EvaluationContent() {
     const checkStatusAndFetch = async (student) => {
       try {
         const studentId = student.email.toLowerCase().trim();
+        
+        // 1. Check if already evaluated
         const statusRef = doc(db, "submissionStatus", studentId)
         const statusSnap = await getDoc(statusRef)
-        
         if (statusSnap.exists()) {
           setHasAlreadyEvaluated(true)
           setFetching(false)
           return
         }
 
+        // 2. Check form settings
         const settingsRef = doc(db, "settings", "formConfig")
         const settingsSnap = await getDoc(settingsRef)
         if (settingsSnap.exists()) {
           setIsFormOpen(settingsSnap.data().isOpen)
         }
 
-        // --- FIX: Query the updated field name using array-contains ---
+        // 3. FETCH PROFESSORS (Fixed field name to assignedYears)
+        const cleanYear = decodeURIComponent(selectedYear).trim();
+        
+        // CHANGED: Querying "assignedYears" instead of "yearLevels"
         const profQuery = query(
           collection(db, "professors"), 
-          where("yearLevels", "array-contains", selectedYear) 
+          where("assignedYears", "array-contains", cleanYear) 
         )
+        
         const querySnapshot = await getDocs(profQuery)
         
-        const profList = querySnapshot.docs.map(doc => ({
-          name: doc.data().name,
-          image: doc.data().imageUrl || "",
-          subjects: doc.data().subjects || []
-        }))
+        console.log(`DEBUG: Searching assignedYears for "${cleanYear}". Found: ${querySnapshot.size}`);
+
+        const profList = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            name: data.name,
+            image: data.imageUrl || "",
+            subjects: data.subjects || [] // Ensure this field exists in your doc or it will be an empty list
+          }
+        })
 
         setEvaluations(profList.map(p => ({
           ...p,
@@ -104,8 +115,9 @@ function EvaluationContent() {
           rating: 5,
           comment: ''
         })))
+
       } catch (error) {
-        console.error("Error fetching evaluation data:", error)
+        console.error("Error fetching data:", error)
       } finally {
         setFetching(false)
       }
@@ -179,6 +191,7 @@ function EvaluationContent() {
             <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 ${modalConfig.type === 'success' ? 'bg-emerald-500/10 text-emerald-500' : modalConfig.type === 'warning' ? 'bg-amber-500/10 text-amber-500' : 'bg-rose-500/10 text-rose-500'}`}>
               {modalConfig.type === 'success' && <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>}
               {modalConfig.type === 'warning' && <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>}
+              {modalConfig.type === 'error' && <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>}
             </div>
             <h3 className="text-white font-black uppercase italic tracking-tighter text-xl mb-2">{modalConfig.title}</h3>
             <p className="text-slate-400 text-xs font-bold uppercase tracking-wide leading-relaxed mb-8">{modalConfig.message}</p>
