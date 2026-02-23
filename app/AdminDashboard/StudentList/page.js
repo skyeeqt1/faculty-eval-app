@@ -190,7 +190,7 @@ export default function StudentListPage() {
         </button>
       </div>
 
-      {/* MODAL-STYLE REGISTRATION FORM (SAME AS BEFORE) */}
+      {/* MODAL-STYLE REGISTRATION FORM */}
       {isAddFormOpen && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
           <section className="w-full max-w-2xl bg-slate-900 border border-indigo-500/30 p-8 rounded-[2.5rem] shadow-2xl animate-in zoom-in-95 duration-300">
@@ -346,14 +346,91 @@ export default function StudentListPage() {
         </div>
       </section>
 
-      {/* MOBILE FLOATING ACTION BUTTON - ONLY WAY TO ADD ON MOBILE */}
+      {/* MOBILE FAB */}
       {!isAddFormOpen && (
         <button onClick={() => setIsAddFormOpen(true)} className="md:hidden fixed bottom-8 right-6 w-14 h-14 bg-indigo-600 text-white rounded-2xl shadow-2xl flex items-center justify-center z-[500] active:scale-90 transition-transform">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
         </button>
       )}
 
-      {/* [Modals and other components remain the same as the previous code] */}
+      {/* DELETE CONFIRMATION MODAL */}
+      {confirmModal.show && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
+          <div className="w-full max-w-sm bg-slate-900 border border-white/10 rounded-[2.5rem] p-10 text-center shadow-2xl animate-in zoom-in-95">
+            <h3 className="text-xl font-black text-white uppercase italic leading-tight mb-2">Remove Access?</h3>
+            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-8 leading-relaxed">Confirm deletion of<br/><span className="text-rose-500">{confirmModal.name}</span></p>
+            <input 
+              type="text" 
+              placeholder="Reason for deletion" 
+              value={deleteReason} 
+              onChange={(e) => setDeleteReason(e.target.value)} 
+              className="w-full bg-slate-800 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold uppercase tracking-widest focus:border-rose-500 outline-none text-white mb-6"
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <button onClick={() => {setConfirmModal({ show: false, id: null, name: '' }); setDeleteReason('')}} className="py-4 bg-slate-800 text-slate-300 rounded-2xl font-black text-[10px] uppercase">Back</button>
+              <button onClick={handleDelete} className="py-4 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-rose-600/20 active:scale-95">Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* GLOBAL RESET MODAL */}
+      {globalVoteResetModal && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
+          <div className="w-full max-w-sm bg-slate-900 border border-white/10 rounded-[2.5rem] p-10 text-center shadow-2xl animate-in zoom-in-95">
+            <h3 className="text-xl font-black text-white uppercase italic leading-tight mb-2">Reset All?</h3>
+            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-8 leading-relaxed">This will reset evaluation status<br/>for ALL students.</p>
+            <div className="grid grid-cols-2 gap-4">
+              <button onClick={() => setGlobalVoteResetModal(false)} className="py-4 bg-slate-800 text-slate-300 rounded-2xl font-black text-[10px] uppercase">Back</button>
+              <button onClick={executeGlobalVoteReset} className="py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-emerald-600/20 active:scale-95">Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PASSWORD RESET MODAL */}
+      {resetConfirmModal.show && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
+          <div className="w-full max-w-sm bg-slate-900 border border-white/10 rounded-[2.5rem] p-10 text-center shadow-2xl animate-in zoom-in-95">
+            <h3 className="text-xl font-black text-white uppercase italic leading-tight mb-2">Reset Password?</h3>
+            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-8 leading-relaxed">Generate new temporary credentials<br/>for <span className="text-indigo-400">{resetConfirmModal.student?.firstName}</span>?</p>
+            <div className="grid grid-cols-2 gap-4">
+              <button onClick={() => setResetConfirmModal({ show: false, student: null })} className="py-4 bg-slate-800 text-slate-300 rounded-2xl font-black text-[10px] uppercase">Back</button>
+              <button onClick={executePasswordReset} className="py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-indigo-600/20 active:scale-95">Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NEW PASSWORD DISPLAY */}
+      {generatedPassword && (
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-xl">
+          <div className="w-full max-w-sm bg-slate-900 border-2 border-indigo-500/50 rounded-[2.5rem] p-10 text-center shadow-2xl">
+            <h3 className="text-xl font-black text-white uppercase italic mb-6">New Password</h3>
+            <div className="bg-slate-800 p-6 rounded-2xl mb-6 flex items-center justify-between group">
+              <span className="text-2xl font-black text-indigo-400 tracking-widest">{generatedPassword}</span>
+              <button onClick={handleCopy} className="p-3 bg-indigo-500/10 text-indigo-400 rounded-xl hover:bg-indigo-600 hover:text-white transition-all">
+                {copied ? <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg> : <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>}
+              </button>
+            </div>
+            <button onClick={() => setGeneratedPassword('')} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase">Done</button>
+          </div>
+        </div>
+      )}
+
+      {/* TOAST */}
+      {toast.show && (
+        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[4000] bg-indigo-600 text-white px-8 py-4 rounded-2xl shadow-2xl">
+          <span className="text-[10px] font-black uppercase tracking-widest">{toast.message}</span>
+        </div>
+      )}
+
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.2); border-radius: 20px; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+      `}</style>
     </div>
   )
 }
