@@ -1,41 +1,47 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { db } from '../../../lib/firebase'
-import { 
-  collection, 
-  onSnapshot, 
-  query, 
-  orderBy, 
-  limit 
-} from 'firebase/firestore'
+import { supabase } from '../../../lib/supabase'
 
 export default function ActivityLogs() {
   const [loading, setLoading] = useState(true)
   const [logs, setLogs] = useState([])
 
   useEffect(() => {
-    // Listens to your 'audit_logs' collection
-    const q = query(
-      collection(db, "audit_logs"), 
-      orderBy("timestamp", "desc"),
-      limit(100) 
-    )
+    const channel = supabase
+      .channel('audit-logs-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, (payload) => {
+        fetchLogs()
+      })
+      .subscribe()
 
-    const unsubLogs = onSnapshot(q, (snap) => {
-      setLogs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })))
-      setLoading(false)
-    }, (error) => {
-      console.error("Firestore Error:", error)
-      setLoading(false)
-    })
+    fetchLogs()
 
-    return () => unsubLogs()
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
+
+  const fetchLogs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("audit_logs")
+        .select("*")
+        .order("timestamp", { ascending: false })
+        .limit(100)
+
+      if (error) throw error
+      setLogs(data || [])
+    } catch (err) {
+      console.error("Error fetching logs:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const formatTimestamp = (ts) => {
     if (!ts) return "---"
-    // Handles both Firestore Timestamp objects and standard JS dates
-    const date = ts.toDate ? ts.toDate() : new Date(ts)
+    // Handles both ISO strings and standard JS dates
+    const date = ts instanceof Date ? ts : new Date(ts)
     return new Intl.DateTimeFormat('en-PH', {
       month: 'short',
       day: 'numeric',
@@ -81,7 +87,7 @@ export default function ActivityLogs() {
             <tbody className="divide-y divide-white/5">
               {logs.length > 0 ? (
                 logs.map((log) => {
-                  // Style logic based on your Firestore strings
+                  // Style logic based on the action strings
                   const isReset = log.action?.includes('RESET');
                   const isDelete = log.action?.toLowerCase().includes('delete') || log.action?.toLowerCase().includes('remove');
                   
@@ -107,7 +113,7 @@ export default function ActivityLogs() {
                       <td className="hidden md:table-cell p-6">
                         <div className="inline-flex items-center px-3 py-1 bg-slate-800/50 border border-white/5 rounded-full">
                           <span className="text-slate-400 text-[9px] font-black uppercase tracking-tighter">
-                            {log.adminEmail}
+                            {log.adminemail}
                           </span>
                         </div>
                       </td>

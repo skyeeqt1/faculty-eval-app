@@ -1,9 +1,7 @@
 'use client'
 import { useRouter } from 'next/navigation'
-import { auth, db } from '../../lib/firebase' 
+import { supabase } from '../../lib/supabase' 
 import { useState, useEffect, useCallback } from 'react'
-import { onAuthStateChanged, signOut } from 'firebase/auth'
-import { doc, onSnapshot, getDoc, collection, query, where, getDocs } from 'firebase/firestore'
 
 export default function StudentPage() {
   const router = useRouter()
@@ -40,63 +38,76 @@ export default function StudentPage() {
       setLoading(false) // Data is found, stop the loading screen
     }
 
-    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        // Handle Admin auto-redirect
-        if (user.email.toLowerCase() === "admintest@gmail.com") {
-          router.replace('/AdminDashboard')
-          return
-        }
-        
-        // Sync name and year level from Firestore if Firebase user exists
-        try {
-          // Query by email field, not document ID
-          const studentsRef = collection(db, "authorized_students")
-          const q = query(studentsRef, where("email", "==", user.email.toLowerCase()))
-          const querySnapshot = await getDocs(q)
-          if (!querySnapshot.empty) {
-            const userDoc = querySnapshot.docs[0]
-            const data = userDoc.data()
-            setUserName(data.firstName || data.name)
-            setYearLevel(data.yearLevel || null)
-            setBlock(data.block || null)
-            setStudentData(data)
-            // Store session data including year level and block
-            sessionStorage.setItem("studentSession", JSON.stringify({
-              firstName: data.firstName,
-              lastName: data.lastName,
-              email: data.email,
-              yearLevel: data.yearLevel,
-              block: data.block
-            }))
-          }
-        } catch (error) { console.error(error) }
-        setLoading(false)
-      } else {
-        // Redirect to login if session is missing
-        if (!sessionStorage.getItem("studentSession")) {
-          router.replace('/')
-        }
-      }
-    })
+    // Check admin session
+    const savedAdmin = sessionStorage.getItem("adminSession")
+    if (savedAdmin) {
+      router.replace('/AdminDashboard')
+      return
+    }
 
-    const unsubscribeStatus = onSnapshot(doc(db, "settings", "formConfig"), (snapshot) => {
-      if (snapshot.exists()) {
-        setIsFormOpen(snapshot.data().isOpen)
-        setSemester(snapshot.data().semester || '1st Semester')
+    // Subscribe to settings changes
+    const channel = supabase
+      .channel('settings-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, (payload) => {
+        if (payload.new && payload.new.id === 'formConfig') {
+          setIsFormOpen(payload.new.isopen)
+          setSemester(payload.new.semester || '1st Semester')
+        }
+      })
+      .subscribe()
+
+    const fetchSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("settings")
+          .select("*")
+          .eq("id", "formConfig")
+          .single()
+
+        if (data) {
+          setIsFormOpen(data.isopen)
+          setSemester(data.semester || '1st Semester')
+        }
+      } catch (err) {
+        console.error("Error fetching settings:", err)
       }
-    })
+    }
+
+    fetchSettings()
+
+    // Check if user is logged in via Supabase session
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        // Query by email field
+        const { data: students, error } = await supabase
+          .from("authorized_students")
+          .select("*")
+          .eq("email", session.user.email.toLowerCase())
+          .single()
+        
+        if (students) {
+          setUserName(students.firstname || students.name)
+          setYearLevel(students.yearlevel || null)
+          setBlock(students.block || null)
+          setStudentData(students)
+        }
+      }
+      setLoading(false)
+    }
+
+    checkAuth()
 
     return () => {
-      unsubscribeAuth()
-      unsubscribeStatus()
+      supabase.removeChannel(channel)
     }
   }, [router])
 
   const handleLogout = async () => {
     try {
       sessionStorage.removeItem("studentSession") // Clear the session
-      await signOut(auth)
+      sessionStorage.removeItem("adminSession")
+      await supabase.auth.signOut()
       router.replace('/')
     } catch (error) {
       console.error("Error signing out:", error)

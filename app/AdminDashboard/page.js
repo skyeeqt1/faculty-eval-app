@@ -1,7 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { db } from '../../lib/firebase'
-import { doc, getDoc, setDoc, collection, onSnapshot, query } from 'firebase/firestore'
+import { supabase } from '../../lib/supabase'
 
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
@@ -15,19 +14,41 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchSettings()
-    const q = query(collection(db, "evaluations"))
-    const unsubRanking = onSnapshot(q, (snapshot) => {
-      const allEvals = snapshot.docs.map(doc => doc.data())
+    
+    // Subscribe to evaluations table for real-time updates
+    const channel = supabase
+      .channel('evaluations-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'evaluations' }, (payload) => {
+        fetchEvaluations()
+      })
+      .subscribe()
+
+    fetchEvaluations()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
+  const fetchEvaluations = async () => {
+    try {
+      const { data: allEvals, error } = await supabase
+        .from("evaluations")
+        .select("*")
+
+      if (error) throw error
+
       const grouped = allEvals.reduce((acc, curr) => {
-        const name = curr.professorName || "Unknown"
+        const name = curr.professorname || "Unknown"
         const rating = parseFloat(curr.rating) || 0
         if (!acc[name]) {
-          acc[name] = { name, total: 0, count: 0, imageUrl: curr.professorImage || null }
+          acc[name] = { name, total: 0, count: 0, imageUrl: curr.professorimage || null }
         }
         acc[name].total += rating
         acc[name].count += 1
         return acc
       }, {})
+      
       const sortedProfs = Object.values(grouped)
         .map((p) => ({
           id: p.name,
@@ -36,20 +57,48 @@ export default function AdminDashboard() {
           imageUrl: p.imageUrl
         }))
         .sort((a, b) => b.rating - a.rating)
+      
       setRanking(sortedProfs)
+    } catch (err) {
+      console.error("Error fetching evaluations:", err)
+    } finally {
       setLoading(false)
-    })
-    return () => unsubRanking()
-  }, [])
+    }
+  }
 
   const fetchSettings = async () => {
     try {
-      const docSnap = await getDoc(doc(db, "settings", "formConfig"))
-      if (docSnap.exists()) {
-        setIsFormOpen(docSnap.data().isOpen)
-        setSemester(docSnap.data().semester || '1st Semester')
+      const { data, error } = await supabase
+        .from("settings")
+        .select("*")
+        .eq("id", "formConfig")
+        .single()
+
+      if (data) {
+        setIsFormOpen(data.isopen)
+        setSemester(data.semester || '1st Semester')
       }
-    } catch (err) { console.error("Error fetching settings:", err) }
+    } catch (err) { 
+      console.error("Error fetching settings:", err) 
+    }
+  }
+
+  const logActivity = async (action, details) => {
+    try {
+      const adminEmail = sessionStorage.getItem("adminEmail") || "admintest@gmail.com"
+      const logId = crypto.randomUUID()
+      const { data, error } = await supabase.from("audit_logs").insert({
+        id: logId,
+        action: action,
+        adminemail: adminEmail,
+        details: details,
+        timestamp: new Date().toISOString()
+      })
+      
+      if (error) {
+        console.error("Audit log error:", error)
+      }
+    } catch (err) { console.error("Log failed:", err) }
   }
 
   const togglePortal = async () => {
@@ -58,19 +107,45 @@ export default function AdminDashboard() {
       show: true,
       title: `Switch evaluation portal to ${nextStatus ? 'LIVE' : 'OFFLINE'} for ${semester}?`,
       onConfirm: async () => {
-        await setDoc(doc(db, "settings", "formConfig"), { isOpen: nextStatus, semester: semester, updatedAt: new Date() });
-        setIsFormOpen(nextStatus);
-        setToast({ show: true, message: `System: ${nextStatus ? 'Live' : 'Offline'} for ${semester}` });
-        setTimeout(() => setToast({ show: false, message: '' }), 2000);
+        const { error } = await supabase
+          .from("settings")
+          .upsert({ 
+            id: "formConfig", 
+            isopen: nextStatus, 
+            semester: semester, 
+            updatedat: new Date().toISOString() 
+          }, { onConflict: 'id' })
+        
+        if (!error) {
+          setIsFormOpen(nextStatus);
+          setToast({ show: true, message: `System: ${nextStatus ? 'Live' : 'Offline'} for ${semester}` });
+          setTimeout(() => setToast({ show: false, message: '' }), 2000);
+          
+          // Log the portal status change
+          await logActivity(nextStatus ? "PORTAL_OPENED" : "PORTAL_CLOSED", `Evaluation portal ${nextStatus ? 'opened' : 'closed'} for ${semester}`);
+        }
       }
     });
   }
 
   const handleSemesterChange = async (newSemester) => {
     setSemester(newSemester)
-    await setDoc(doc(db, "settings", "formConfig"), { isOpen: isFormOpen, semester: newSemester, updatedAt: new Date() });
-    setToast({ show: true, message: `Semester set to ${newSemester}` });
-    setTimeout(() => setToast({ show: false, message: '' }), 2000);
+    const { error } = await supabase
+      .from("settings")
+      .upsert({ 
+        id: "formConfig", 
+        isopen: isFormOpen, 
+        semester: newSemester, 
+        updatedat: new Date().toISOString() 
+      }, { onConflict: 'id' })
+    
+    if (!error) {
+      setToast({ show: true, message: `Semester set to ${newSemester}` });
+      setTimeout(() => setToast({ show: false, message: '' }), 2000);
+      
+      // Log semester change
+      await logActivity("SEMESTER_CHANGED", `Changed semester to ${newSemester}`);
+    }
   }
 
   if (loading) return (

@@ -1,10 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { db, auth } from '../../../lib/firebase'
-import { 
-  collection, deleteDoc, doc, onSnapshot, query, orderBy, addDoc, 
-  serverTimestamp, getDocs, writeBatch, updateDoc 
-} from 'firebase/firestore'
+import { supabase } from '../../../lib/supabase'
 
 export default function StudentListPage() {
   const [loading, setLoading] = useState(true)
@@ -41,23 +37,45 @@ export default function StudentListPage() {
   const blocks = ["Blk A", "Blk B", "Blk C", "Blk D", "Blk E"]
 
   useEffect(() => {
-    const q = query(collection(db, "authorized_students"), orderBy("createdAt", "desc"))
-    const unsubStudents = onSnapshot(q, (snap) => {
-      setStudents(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-      setLoading(false)
-    })
-    return () => unsubStudents()
+    const channel = supabase
+      .channel('students-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'authorized_students' }, (payload) => {
+        fetchStudents()
+      })
+      .subscribe()
+
+    fetchStudents()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
+
+  const fetchStudents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("authorized_students")
+        .select("*")
+        .order("createdat", { ascending: false })
+
+      if (error) throw error
+      setStudents(data || [])
+    } catch (err) {
+      console.error("Error fetching students:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // Populate form when editing a student
   useEffect(() => {
     if (editingStudent) {
       setNewStudent({
-        firstName: editingStudent.firstName || '',
-        lastName: editingStudent.lastName || '',
+        firstName: editingStudent.firstname || '',
+        lastName: editingStudent.lastname || '',
         email: editingStudent.email || '',
         password: '', // Don't show actual password for privacy
-        yearLevel: editingStudent.yearLevel || '',
+        yearLevel: editingStudent.yearlevel || '',
         block: editingStudent.block || ''
       })
     } else {
@@ -68,12 +86,21 @@ export default function StudentListPage() {
 
   const logActivity = async (action, details) => {
     try {
-      await addDoc(collection(db, "audit_logs"), {
+      const adminEmail = sessionStorage.getItem("adminEmail") || "admintest@gmail.com"
+      const logId = crypto.randomUUID()
+      const { data, error } = await supabase.from("audit_logs").insert({
+        id: logId,
         action: action,
-        adminEmail: auth.currentUser?.email || "admintest@gmail.com",
+        adminemail: adminEmail,
         details: details,
-        timestamp: serverTimestamp()
+        timestamp: new Date().toISOString()
       })
+      
+      if (error) {
+        console.error("Audit log error:", error)
+      } else {
+        console.log("Activity logged:", action, details)
+      }
     } catch (err) { console.error("Log failed:", err) }
   }
 
@@ -103,55 +130,95 @@ export default function StudentListPage() {
       if (editingStudent) {
         // Update existing student
         const updateData = {
-          firstName: newStudent.firstName.trim(),
-          lastName: newStudent.lastName.trim(),
+          firstname: newStudent.firstName.trim(),
+          lastname: newStudent.lastName.trim(),
           email: newStudent.email.trim().toLowerCase(),
-          yearLevel: newStudent.yearLevel,
+          yearlevel: newStudent.yearLevel,
           block: newStudent.block
         }
         // Only update password if a new one is provided
         if (newStudent.password) {
           updateData.password = newStudent.password
         }
-        await updateDoc(doc(db, "authorized_students", editingStudent.id), updateData)
+        
+        const { error } = await supabase
+          .from("authorized_students")
+          .update(updateData)
+          .eq("id", editingStudent.id)
+
+        if (error) throw error
+        
         await logActivity("UPDATE_STUDENT", `Updated: ${studentName} (${newStudent.yearLevel} - ${newStudent.block})`)
         setEditingStudent(null)
         showToast("Student Updated")
+        
+        // Refresh the students list
+        fetchStudents()
       } else {
-        // Add new student
-        await addDoc(collection(db, "authorized_students"), {
-          firstName: newStudent.firstName.trim(),
-          lastName: newStudent.lastName.trim(),
-          email: newStudent.email.trim().toLowerCase(),
-          password: newStudent.password,
-          yearLevel: newStudent.yearLevel,
-          block: newStudent.block,
-          mustChangePassword: true,
-          hasEvaluate: false,
-          createdAt: serverTimestamp()
-        })
+        // Add new student with random UUID
+        const studentId = crypto.randomUUID()
+        
+        const { error } = await supabase
+          .from("authorized_students")
+          .insert({
+            id: studentId,
+            firstname: newStudent.firstName.trim(),
+            lastname: newStudent.lastName.trim(),
+            email: newStudent.email.trim().toLowerCase(),
+            password: newStudent.password,
+            yearlevel: newStudent.yearLevel,
+            block: newStudent.block,
+            mustchangepassword: true,
+            hasevaluate: false,
+            createdat: new Date().toISOString()
+          })
+
+        if (error) throw error
+        
         await logActivity("REGISTER_STUDENT", `Registered: ${studentName} (${newStudent.yearLevel} - ${newStudent.block})`)
         showToast("Student Registered")
+        
+        // Refresh the students list
+        fetchStudents()
       }
       setNewStudent({ firstName: '', lastName: '', email: '', password: '', yearLevel: '', block: '' })
       setIsAddFormOpen(false)
-    } catch (err) { showToast("Action failed") }
+    } catch (err) { 
+      console.error("Error:", err)
+      showToast("Action failed") 
+    }
   }
 
   const executeGlobalVoteReset = async () => {
     try {
-      const batch = writeBatch(db)
-      const studentSnapshot = await getDocs(collection(db, "authorized_students"))
-      studentSnapshot.forEach((studentDoc) => {
-        batch.update(studentDoc.ref, { hasEvaluate: false, EvaluateAt: null })
-      })
-      const statusSnapshot = await getDocs(collection(db, "submissionStatus"))
-      statusSnapshot.forEach((statusDoc) => { batch.delete(statusDoc.ref) })
-      await batch.commit()
+      // Get all students first
+      const { data: allStudents, error: fetchError } = await supabase
+        .from("authorized_students")
+        .select("id")
+
+      if (fetchError) throw fetchError
+
+      // Update each student
+      for (const student of allStudents) {
+        await supabase
+          .from("authorized_students")
+          .update({ hasevaluate: false, evaluateat: null })
+          .eq("id", student.id)
+      }
+
+      // Delete all submission status records
+      await supabase.from("submissionstatus").delete().neq("id", "00000000-0000-0000-0000-000000000000")
+      
+      // Refresh the students list
+      fetchStudents()
+      
       await logActivity("GLOBAL_VOTE_STATUS_RESET", "Reset all evaluation statuses")
       showToast("Global status reset")
       setGlobalVoteResetModal(false)
-    } catch (err) { showToast("Global reset failed") }
+    } catch (err) { 
+      console.error("Error:", err)
+      showToast("Global reset failed") 
+    }
   }
 
   const executePasswordReset = async () => {
@@ -161,10 +228,18 @@ export default function StudentListPage() {
       const charset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
       let tempPassword = ""
       for (let i = 0; i < 8; i++) tempPassword += charset.charAt(Math.floor(Math.random() * charset.length))
-      await updateDoc(doc(db, "authorized_students", student.id), { 
-        password: tempPassword, mustChangePassword: true, passwordResetAt: serverTimestamp() 
-      })
-      await logActivity("PASSWORD_RESET", `Generated temp password for ${student.firstName} ${student.lastName}`)
+      
+      const { error } = await supabase
+        .from("authorized_students")
+        .update({ 
+          password: tempPassword, 
+          mustchangepassword: true
+        })
+        .eq("id", student.id)
+
+      if (error) throw error
+      
+      await logActivity("PASSWORD_RESET", `Generated temp password for ${student.firstname} ${student.lastname}`)
       setGeneratedPassword(tempPassword)
       setResetConfirmModal({ show: false, student: null })
       setIsAddFormOpen(false)
@@ -175,12 +250,21 @@ export default function StudentListPage() {
   const handleDelete = async () => {
     if (!deleteReason.trim()) return showToast("Reason required")
     try {
-      await deleteDoc(doc(db, "authorized_students", confirmModal.id))
+      const { error } = await supabase
+        .from("authorized_students")
+        .delete()
+        .eq("id", confirmModal.id)
+
+      if (error) throw error
+      
       await logActivity("REMOVE_ACCESS", `Removed: ${confirmModal.name}. Reason: ${deleteReason}`)
       setConfirmModal({ show: false, id: null, name: '' })
       setDeleteReason('')
       handleCloseDrawer()
       showToast("Access Removed")
+      
+      // Refresh the students list
+      fetchStudents()
     } catch (err) { showToast("Remove failed") }
   }
 
@@ -197,9 +281,9 @@ export default function StudentListPage() {
 
   const filteredStudents = students.filter(s => {
     const matchesSearch = 
-      `${s.firstName} ${s.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      `${s.firstname} ${s.lastname}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesYear = activeYearFilter === 'All' || s.yearLevel === activeYearFilter;
+    const matchesYear = activeYearFilter === 'All' || s.yearlevel === activeYearFilter;
     return matchesSearch && matchesYear;
   })
 
@@ -211,7 +295,7 @@ export default function StudentListPage() {
 
   return (
     <div className="p-4 md:p-8 lg:p-12 max-w-6xl mx-auto w-full h-screen flex flex-col space-y-6 md:space-y-8 overflow-hidden">
-      
+       
       {/* HEADER */}
       <div className="hidden md:flex shrink-0 items-center justify-between gap-6">
         <div>
@@ -380,17 +464,17 @@ export default function StudentListPage() {
                   <td className="p-6">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/10 flex items-center justify-center text-indigo-400 font-black text-xs shrink-0">
-                        {s.firstName[0]}{s.lastName[0]}
+                        {s.firstname?.[0]}{s.lastname?.[0]}
                       </div>
                       <div className="flex flex-col">
-                        <span className="font-black text-slate-200 uppercase italic text-sm group-hover:text-indigo-400 transition-colors truncate">{s.firstName} {s.lastName}</span>
-                        <span className="lg:hidden text-[9px] text-indigo-500 font-black uppercase tracking-widest mt-0.5">{s.yearLevel || 'Unset'}</span>
+                        <span className="font-black text-slate-200 uppercase italic text-sm group-hover:text-indigo-400 transition-colors truncate">{s.firstname} {s.lastname}</span>
+                        <span className="lg:hidden text-[9px] text-indigo-500 font-black uppercase tracking-widest mt-0.5">{s.yearlevel || 'Unset'}</span>
                       </div>
                     </div>
                   </td>
                   <td className="hidden lg:table-cell p-6">
                     <span className="px-3 py-1 bg-indigo-500/10 text-indigo-400 border border-indigo-500/10 rounded-lg text-[9px] font-black uppercase tracking-widest">
-                      {s.yearLevel || 'N/A'}
+                      {s.yearlevel || 'N/A'}
                     </span>
                   </td>
                   <td className="hidden md:table-cell p-6">
@@ -401,7 +485,7 @@ export default function StudentListPage() {
                       <button onClick={(e) => { e.stopPropagation(); setEditingStudent(s); setIsAddFormOpen(true); }} className="p-3 text-indigo-500 hover:bg-indigo-500/10 rounded-xl transition-all cursor-pointer">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); setConfirmModal({ show: true, id: s.id, name: `${s.firstName} ${s.lastName}` }) }} className="p-3 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all cursor-pointer">
+                      <button onClick={(e) => { e.stopPropagation(); setConfirmModal({ show: true, id: s.id, name: `${s.firstname} ${s.lastname}` }) }} className="p-3 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all cursor-pointer">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
                     </div>
@@ -460,7 +544,7 @@ export default function StudentListPage() {
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
           <div className="w-full max-w-sm bg-slate-900 border border-white/10 rounded-[2.5rem] p-10 text-center shadow-2xl animate-in zoom-in-95">
             <h3 className="text-xl font-black text-white uppercase italic leading-tight mb-2">Reset Password?</h3>
-            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-8 leading-relaxed">Generate new temporary credentials<br/>for <span className="text-indigo-400">{resetConfirmModal.student?.firstName}</span>?</p>
+            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-8 leading-relaxed">Generate new temporary credentials<br/>for <span className="text-indigo-400">{resetConfirmModal.student?.firstname}</span>?</p>
             <div className="grid grid-cols-2 gap-4">
               <button onClick={() => setResetConfirmModal({ show: false, student: null })} className="py-4 bg-slate-800 text-slate-300 rounded-2xl font-black text-[10px] uppercase">Back</button>
               <button onClick={executePasswordReset} className="py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-indigo-600/20 active:scale-95">Confirm</button>

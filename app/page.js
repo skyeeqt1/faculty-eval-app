@@ -1,8 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react' 
-import { signInWithEmailAndPassword, onAuthStateChanged, setPersistence, browserSessionPersistence } from 'firebase/auth'
-import { auth, db } from '../lib/firebase' 
-import { collection, query, where, getDocs } from 'firebase/firestore' 
+import { supabase } from '../lib/supabase' 
 import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
@@ -19,18 +17,20 @@ export default function LoginPage() {
       return 
     }
 
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user && user.email.toLowerCase() === "admintest@gmail.com") {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session && session.user.email.toLowerCase() === "admintest@gmail.com") {
+        sessionStorage.setItem("adminSession", JSON.stringify({ email: session.user.email }))
         router.replace('/AdminDashboard')
       }
-    })
+    }
+    checkSession()
 
     const handleOffline = () => {
       setPopup({ show: true, message: "Network Interrupted: Check connection.", isSuccess: false })
     }
     window.addEventListener('offline', handleOffline)
     return () => {
-      unsubscribe()
       window.removeEventListener('offline', handleOffline)
     }
   }, [router])
@@ -46,43 +46,60 @@ export default function LoginPage() {
     const cleanEmail = email.toLowerCase().trim()
 
     try {
+      // Check if it's admin email - use Supabase Auth
       if (cleanEmail === "admintest@gmail.com") {
-        await setPersistence(auth, browserSessionPersistence)
-        await signInWithEmailAndPassword(auth, cleanEmail, password)
-        setPopup({ show: true, message: "Admin identity confirmed...", isSuccess: true })
-        setTimeout(() => router.push('/AdminDashboard'), 2000)
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: password
+        })
+
+        if (error) {
+          setPopup({ show: true, message: "Access Denied: Incorrect password.", isSuccess: false })
+          setLoading(false)
+          return
+        }
+
+        if (data.user) {
+          sessionStorage.setItem("adminSession", JSON.stringify({ email: data.user.email }))
+          setPopup({ show: true, message: "Admin identity confirmed...", isSuccess: true })
+          setTimeout(() => router.push('/AdminDashboard'), 2000)
+          return
+        }
+      }
+
+      // Student login - query from database
+      const { data: students, error } = await supabase
+        .from("authorized_students")
+        .select("*")
+        .eq("email", cleanEmail)
+        .single()
+
+      if (error || !students) {
+        setPopup({ show: true, message: "Access Denied: Email not registered.", isSuccess: false })
+        setLoading(false)
         return
       }
 
-      const studentQuery = query(collection(db, "authorized_students"), where("email", "==", cleanEmail))
-      const querySnapshot = await getDocs(studentQuery)
-
-      if (!querySnapshot.empty) {
-        const studentDoc = querySnapshot.docs[0]
-        const studentData = studentDoc.data()
-
-        if (studentData.password === password) {
-          if (studentData.mustChangePassword) {
-            router.push(`/ChangePassword?id=${studentDoc.id}`)
-            return
-          }
-
-          sessionStorage.setItem("studentSession", JSON.stringify({
-            email: studentData.email,
-            firstName: studentData.firstName,
-            lastName: studentData.lastName,
-            yearLevel: studentData.yearLevel,
-            block: studentData.block,
-            id: studentDoc.id
-          }))
-
-          setPopup({ show: true, message: "Identity verified. Redirecting...", isSuccess: true })
-          setTimeout(() => router.replace('/StudentDashboard'), 1500)
-        } else {
-          setPopup({ show: true, message: "Access Denied: Incorrect password.", isSuccess: false })
+      if (students.password === password) {
+        if (students.mustchangepassword) {
+          router.push(`/ChangePassword?id=${students.id}`)
+          setLoading(false)
+          return
         }
+
+        sessionStorage.setItem("studentSession", JSON.stringify({
+          email: students.email,
+          firstName: students.firstname,
+          lastName: students.lastname,
+          yearLevel: students.yearlevel,
+          block: students.block,
+          id: students.id
+        }))
+
+        setPopup({ show: true, message: "Identity verified. Redirecting...", isSuccess: true })
+        setTimeout(() => router.replace('/StudentDashboard'), 1500)
       } else {
-        setPopup({ show: true, message: "Access Denied: Email not registered.", isSuccess: false })
+        setPopup({ show: true, message: "Access Denied: Incorrect password.", isSuccess: false })
       }
     } catch (error) {
       setPopup({ show: true, message: "System Error: Unable to connect.", isSuccess: false })

@@ -1,7 +1,6 @@
 'use client'
 import { useState, useEffect, Suspense } from 'react'
-import { db } from '../../lib/firebase'
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore'
+import { supabase } from '../../lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 function ChangePasswordContent() {
@@ -32,13 +31,15 @@ function ChangePasswordContent() {
 
     setLoading(true)
     try {
-      const studentRef = doc(db, "authorized_students", studentId)
-      
-      await updateDoc(studentRef, {
-        password: newPassword,
-        mustChangePassword: false,
-        lastPasswordUpdate: serverTimestamp()
-      })
+      const { error } = await supabase
+        .from("authorized_students")
+        .update({
+          password: newPassword,
+          mustchangepassword: false
+        })
+        .eq("id", studentId)
+
+      if (error) throw error
 
       setPopup({ 
         show: true, 

@@ -1,8 +1,7 @@
 'use client'
 import React, { useState, useEffect } from 'react'
-import { auth } from '../../lib/firebase'
+import { supabase } from '../../lib/supabase'
 import { useRouter, usePathname } from 'next/navigation'
-import { onAuthStateChanged, signOut } from 'firebase/auth'
 
 export default function AdminLayout({ children }) {
   const router = useRouter()
@@ -39,19 +38,37 @@ export default function AdminLayout({ children }) {
   };
 
   const handleLogout = async () => {
-    await signOut(auth);
+    await supabase.auth.signOut()
+    sessionStorage.removeItem("adminSession");
     router.replace('/');
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user && user.email?.toLowerCase() === "admintest@gmail.com") {
+    // Check for admin session using Supabase Auth
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (session && session.user.email?.toLowerCase() === "admintest@gmail.com") {
+        sessionStorage.setItem("adminSession", JSON.stringify({ email: session.user.email }))
         setLoading(false)
       } else {
         router.replace('/')
       }
-    });
-    return () => unsubscribe();
+    }
+
+    // Also check localStorage as fallback
+    const adminSession = sessionStorage.getItem("adminSession")
+    if (adminSession) {
+      try {
+        const sessionData = JSON.parse(adminSession)
+        if (sessionData.email?.toLowerCase() === "admintest@gmail.com") {
+          setLoading(false)
+          return
+        }
+      } catch (err) {}
+    }
+    
+    checkAuth()
   }, [router]);
 
   if (loading) return (

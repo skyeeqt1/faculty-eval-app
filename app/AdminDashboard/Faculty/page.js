@@ -1,10 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { db, auth } from '../../../lib/firebase'
-import { 
-  collection, addDoc, deleteDoc, doc, 
-  onSnapshot, serverTimestamp, query, where, getDocs, updateDoc 
-} from 'firebase/firestore'
+import { supabase } from '../../../lib/supabase'
 
 export default function FacultyManagement() {
   const [loading, setLoading] = useState(true)
@@ -26,6 +22,8 @@ export default function FacultyManagement() {
   // Form States
   const [name, setName] = useState('')
   const [imageUrl, setImageUrl] = useState('')
+  const [selectedFile, setSelectedFile] = useState(null)
+  const [uploading, setUploading] = useState(false)
   const [selectedYears, setSelectedYears] = useState([]) 
 
   const yearOptions = ["1st Year", "2nd Year", "3rd Year", "4th Year"]
@@ -34,26 +32,50 @@ export default function FacultyManagement() {
   useEffect(() => {
     if (editingProf) {
       setName(editingProf.name || '')
-      setImageUrl(editingProf.imageUrl || '')
-      setSelectedYears(editingProf.assignedYears || [])
-      setSelectedSubjects(editingProf.subjects || [])
+      setImageUrl(editingProf.imageurl || '')
+      setSelectedYears(Array.isArray(editingProf.assignedyears) ? editingProf.assignedyears : [])
+      setSelectedSubjects(Array.isArray(editingProf.subjects) ? editingProf.subjects : [])
+      setSelectedFile(null)
     } else {
       // Reset form when closing
       setName('')
       setImageUrl('')
       setSelectedYears([])
       setSelectedSubjects([])
+      setSelectedFile(null)
     }
   }, [editingProf])
 
   // Listen to Professors List
   useEffect(() => {
-    const unsubProfs = onSnapshot(collection(db, "professors"), (snap) => {
-      setProfessors(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })))
-      setLoading(false)
-    })
-    return () => unsubProfs()
+    const channel = supabase
+      .channel('professors-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'professors' }, (payload) => {
+        fetchProfessors()
+      })
+      .subscribe()
+
+    fetchProfessors()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
+
+  const fetchProfessors = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("professors")
+        .select("*")
+      
+      if (error) throw error
+      setProfessors(data || [])
+    } catch (err) {
+      console.error("Error fetching professors:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // FETCH SUBJECTS BASED ON SELECTED YEARS
   useEffect(() => {
@@ -64,16 +86,18 @@ export default function FacultyManagement() {
         return
       }
       try {
-        const q = query(collection(db, "subjects"), where("yearLevel", "in", selectedYears))
-        const snap = await getDocs(q)
-        const subs = snap.docs.map(doc => {
-          const data = doc.data()
-          return { 
-            id: doc.id, 
-            title: data.name, 
-            year: data.yearLevel 
-          }
-        })
+        const { data, error } = await supabase
+          .from("subjects")
+          .select("*")
+          .in("yearlevel", selectedYears)
+
+        if (error) throw error
+        
+        const subs = (data || []).map(doc => ({
+          id: doc.id, 
+          title: doc.name, 
+          year: doc.yearlevel 
+        }))
         setAvailableSubjects(subs)
       } catch (err) {
         console.error("Error fetching subjects:", err)
@@ -84,13 +108,71 @@ export default function FacultyManagement() {
 
   const logActivity = async (action, details) => {
     try {
-      await addDoc(collection(db, "audit_logs"), {
+      const adminEmail = sessionStorage.getItem("adminEmail") || "admintest@gmail.com"
+      const logId = crypto.randomUUID()
+      const { data, error } = await supabase.from("audit_logs").insert({
+        id: logId,
         action: action,
-        adminEmail: auth.currentUser?.email || "admintest@gmail.com",
+        adminemail: adminEmail,
         details: details,
-        timestamp: serverTimestamp()
+        timestamp: new Date().toISOString()
       })
+      
+      if (error) {
+        console.error("Audit log error:", error)
+      } else {
+        console.log("Activity logged:", action, details)
+      }
     } catch (err) { console.error("Log failed:", err) }
+  }
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        showToast("Please select an image file")
+        return
+      }
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        showToast("File size must be less than 5MB")
+        return
+      }
+      setSelectedFile(file)
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file)
+      setImageUrl(previewUrl)
+    }
+  }
+
+  const uploadImage = async (file) => {
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+      const filePath = `faculty/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('faculty-photos')
+        .upload(filePath, file)
+
+      if (uploadError) {
+        // If bucket doesn't exist, try to create it or use public URL directly
+        console.error('Upload error:', uploadError)
+        // Fallback: return blob URL as temporary solution
+        return URL.createObjectURL(file)
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('faculty-photos')
+        .getPublicUrl(filePath)
+
+      return publicUrl
+    } catch (err) {
+      console.error('Error uploading image:', err)
+      // Fallback to blob URL if storage fails
+      return URL.createObjectURL(file)
+    }
   }
 
   const handleYearToggle = (year) => {
@@ -113,40 +195,82 @@ export default function FacultyManagement() {
     if (selectedSubjects.length === 0) return showToast("Select at least one Subject")
 
     try {
+      let finalImageUrl = imageUrl
+      
+      // Upload new file if selected
+      if (selectedFile) {
+        setUploading(true)
+        finalImageUrl = await uploadImage(selectedFile)
+        setUploading(false)
+      }
+
       if (editingProf) {
         // Update existing professor
-        await updateDoc(doc(db, "professors", editingProf.id), {
-          name: name.trim(),
-          imageUrl: imageUrl.trim() || null,
-          assignedYears: selectedYears,
-          subjects: selectedSubjects
-        })
+        const { error } = await supabase
+          .from("professors")
+          .update({
+            name: name.trim(),
+            imageurl: finalImageUrl || null,
+            assignedyears: selectedYears,
+            subjects: selectedSubjects
+          })
+          .eq("id", editingProf.id)
+
+        if (error) throw error
+        
         await logActivity("UPDATE_INSTRUCTOR", `Updated: ${name.trim()}`)
         setEditingProf(null)
         showToast("Instructor Updated")
+        
+        // Refresh the professors list
+        fetchProfessors()
       } else {
-        // Add new professor
-        await addDoc(collection(db, "professors"), {
-          name: name.trim(),
-          imageUrl: imageUrl.trim() || null,
-          assignedYears: selectedYears,
-          subjects: selectedSubjects,
-          createdAt: serverTimestamp()
-        })
+        // Add new professor with random UUID
+        const profId = crypto.randomUUID()
+        
+        const { error } = await supabase
+          .from("professors")
+          .insert({
+            id: profId,
+            name: name.trim(),
+            imageurl: finalImageUrl || null,
+            assignedyears: selectedYears,
+            subjects: selectedSubjects,
+            createdat: new Date().toISOString()
+          })
+
+        if (error) throw error
+        
         await logActivity("REGISTER_INSTRUCTOR", `Registered: ${name.trim()}`)
         showToast("Instructor Registered")
+        
+        // Refresh the professors list
+        fetchProfessors()
       }
-      setName(''); setImageUrl(''); setSelectedYears([]); setSelectedSubjects([]);
+      setName(''); setImageUrl(''); setSelectedYears([]); setSelectedSubjects([]); setSelectedFile(null);
       setIsAddFormOpen(false)
-    } catch (err) { showToast("Action failed") }
+    } catch (err) { 
+      console.error("Error:", err)
+      setUploading(false)
+      showToast("Action failed") 
+    }
   }
 
   const confirmDelete = async () => {
     try {
-      await deleteDoc(doc(db, "professors", confirmModal.id))
+      const { error } = await supabase
+        .from("professors")
+        .delete()
+        .eq("id", confirmModal.id)
+
+      if (error) throw error
+      
       await logActivity("REMOVE_INSTRUCTOR", `Deleted: ${confirmModal.name}`)
       setConfirmModal({ show: false, id: null, name: '' })
       showToast("Instructor Removed")
+      
+      // Refresh the professors list
+      fetchProfessors()
     } catch (err) { showToast("Action failed") }
   }
 
@@ -209,15 +333,50 @@ export default function FacultyManagement() {
             </div>
 
             <form onSubmit={handleAddFaculty} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] ml-1">Full Name</label>
-                  <input type="text" placeholder="Full Name" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-slate-800 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold uppercase tracking-widest outline-none text-white focus:border-indigo-500"/>
+              {/* CIRCULAR PHOTO UPLOAD AT TOP */}
+              <div className="flex flex-col items-center mb-8">
+                <div className="relative group">
+                  <div className="w-32 h-32 rounded-full bg-slate-800 border-4 border-indigo-500/30 flex items-center justify-center overflow-hidden cursor-pointer hover:border-indigo-500 transition-all">
+                    {imageUrl ? (
+                      <img src={imageUrl} alt="Instructor profile photo" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-slate-500">
+                        <svg className="w-10 h-10 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        <span className="text-[8px] font-black uppercase">Photo</span>
+                      </div>
+                    )}
+                    {uploading && (
+                      <div className="absolute inset-0 bg-slate-900/80 flex items-center justify-center">
+                        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                    )}
+                  </div>
+                  <input 
+                    type="file" 
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    disabled={uploading}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  {imageUrl && !uploading && (
+                    <button 
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedFile(null); setImageUrl(''); }}
+                      className="absolute -top-1 -right-1 w-7 h-7 bg-rose-500 rounded-full flex items-center justify-center text-white text-sm font-black shadow-lg hover:bg-rose-400 transition-all"
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] ml-1">Profile Image URL</label>
-                  <input type="text" placeholder="HTTPS://IMAGE.LINK" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} className="w-full bg-slate-800 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold uppercase tracking-widest outline-none text-white focus:border-indigo-500"/>
-                </div>
+                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-3">
+                  {imageUrl ? 'Change Photo' : 'Click to upload photo'}
+                </p>
+              </div>
+
+              {/* TEXT DETAILS BELOW */}
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] ml-1">Full Name</label>
+                <input type="text" placeholder="Enter full name" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-slate-800 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold uppercase tracking-widest outline-none text-white focus:border-indigo-500"/>
               </div>
 
               <div className="space-y-3">
@@ -239,16 +398,16 @@ export default function FacultyManagement() {
                 ) : (
                   <div className="relative">
                     <button type="button" onClick={() => setIsSubjectDropdownOpen(!isSubjectDropdownOpen)} className="w-full bg-slate-800 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold uppercase tracking-widest text-left text-white flex justify-between items-center hover:border-indigo-500 transition-all cursor-pointer">
-                      <span className="truncate">{selectedSubjects.length > 0 ? selectedSubjects.join(", ") : "-- Select Subjects --"}</span>
+                      <span className="truncate">{Array.isArray(selectedSubjects) && selectedSubjects.length > 0 ? selectedSubjects.join(", ") : "-- Select Subjects --"}</span>
                       <svg className={`w-4 h-4 transition-transform ${isSubjectDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     {isSubjectDropdownOpen && (
                       <div className="absolute z-[1100] top-full left-0 w-full mt-2 bg-slate-800 border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2">
                         <div className="max-h-60 overflow-y-auto custom-scrollbar p-2 space-y-1">
                           {availableSubjects.map(sub => (
-                            <button key={sub.id} type="button" onClick={() => handleSubjectToggle(sub.title)} className={`w-full p-3 rounded-xl text-left flex justify-between items-center transition-all cursor-pointer ${selectedSubjects.includes(sub.title) ? 'bg-indigo-600 text-white' : 'hover:bg-white/5 text-slate-400'}`}>
+                            <button key={sub.id} type="button" onClick={() => handleSubjectToggle(sub.title)} className={`w-full p-3 rounded-xl text-left flex justify-between items-center transition-all cursor-pointer ${Array.isArray(selectedSubjects) && selectedSubjects.includes(sub.title) ? 'bg-indigo-600 text-white' : 'hover:bg-white/5 text-slate-400'}`}>
                               <span className="text-[10px] font-black uppercase tracking-tight">{sub.title}</span>
-                              <span className={`text-[8px] font-bold uppercase ${selectedSubjects.includes(sub.title) ? 'text-indigo-200' : 'text-slate-600'}`}>{sub.year}</span>
+                              <span className={`text-[8px] font-bold uppercase ${Array.isArray(selectedSubjects) && selectedSubjects.includes(sub.title) ? 'text-indigo-200' : 'text-slate-600'}`}>{sub.year}</span>
                             </button>
                           ))}
                         </div>
@@ -260,7 +419,7 @@ export default function FacultyManagement() {
 
               <div className="flex gap-3 pt-12">
                 <button type="button" onClick={() => { setIsAddFormOpen(false); setEditingProf(null); }} className="flex-1 py-4 bg-slate-800 text-slate-400 font-black text-[10px] uppercase rounded-2xl cursor-pointer">Discard</button>
-                <button type="submit" className="flex-[2] py-4 bg-indigo-600 text-white font-black text-[10px] uppercase rounded-2xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer">{editingProf ? 'Update Faculty' : 'Confirm Faculty'}</button>
+                <button type="submit" disabled={uploading} className="flex-[2] py-4 bg-indigo-600 text-white font-black text-[10px] uppercase rounded-2xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">{uploading ? 'Uploading...' : (editingProf ? 'Update Faculty' : 'Confirm Faculty')}</button>
               </div>
             </form>
           </section>
@@ -284,19 +443,25 @@ export default function FacultyManagement() {
                   <td className="p-6">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/10 flex items-center justify-center overflow-hidden shrink-0">
-                        {prof.imageUrl ? <img src={prof.imageUrl} alt="" className="w-full h-full object-cover" /> : <span className="text-indigo-400 font-black text-xs">{prof.name[0]}</span>}
+                        {prof.imageurl ? <img src={prof.imageurl} alt="" className="w-full h-full object-cover" /> : <span className="text-indigo-400 font-black text-xs">{prof.name[0]}</span>}
                       </div>
                       <div className="flex flex-col">
                         <span className="font-black text-slate-200 uppercase italic text-sm group-hover:text-indigo-400 truncate transition-colors">{prof.name}</span>
-                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">{prof.assignedYears?.join(", ")}</span>
+                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
+                          {Array.isArray(prof.assignedyears) 
+                            ? prof.assignedyears.join(" • ") 
+                            : typeof prof.assignedyears === 'string' 
+                              ? prof.assignedyears.replace(/[\[\]"]/g, '') 
+                              : prof.assignedyears}
+                        </span>
                       </div>
                     </div>
                   </td>
                   <td className="hidden md:table-cell p-6">
                     <div className="flex flex-wrap gap-1">
-                      {prof.subjects?.map(sub => (
+                      {Array.isArray(prof.subjects) ? prof.subjects.map(sub => (
                         <span key={sub} className="px-2 py-0.5 bg-slate-800 border border-white/5 text-slate-400 text-[8px] font-black uppercase rounded-md">{sub}</span>
-                      ))}
+                      )) : <span className="text-slate-500 text-[8px]">-</span>}
                     </div>
                   </td>
                   <td className="p-6 text-right">

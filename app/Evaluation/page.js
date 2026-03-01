@@ -1,15 +1,13 @@
 'use client'
 import { useState, useEffect, Suspense } from 'react'
-import { db, auth } from '../../lib/firebase'
-import { collection, getDocs, writeBatch, doc, serverTimestamp, getDoc, query, where } from 'firebase/firestore'
+import { supabase } from '../../lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { onAuthStateChanged } from 'firebase/auth'
 
 export default function EvaluationPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#0f172a]">
-        <div className="w-12 h-12 border-4 border-indigo-600/20 border-t-indigo-500 rounded-full animate-spin"></div>
+          <div className="w-12 h-12 border-4 border-indigo-600/20 border-t-indigo-500 rounded-full animate-spin"></div>
       </div>
     }>
       <EvaluationContent />
@@ -52,97 +50,155 @@ function EvaluationContent() {
   useEffect(() => {
     const checkAccess = async () => {
       const sessionData = sessionStorage.getItem("studentSession")
-      const unsubscribe = onAuthStateChanged(auth, async (user) => {
-        const student = user ? { email: user.email } : (sessionData ? JSON.parse(sessionData) : null);
-        if (!student) {
-          router.replace('/')
-          return
-        }
-        setCurrentStudent(student)
-        if (!selectedYear) {
-          router.replace('/StudentDashboard')
-          return
-        }
-        await checkStatusAndFetch(student)
-      })
-      return () => unsubscribe()
-    }
-
-    const checkStatusAndFetch = async (student) => {
-      try {
-        const studentId = student.email.toLowerCase().trim();
-        
-    // Check if already evaluated
-        const statusRef = doc(db, "submissionStatus", studentId)
-        const statusSnap = await getDoc(statusRef)
-        if (statusSnap.exists()) {
-          setHasAlreadyEvaluated(true)
-          setFetching(false)
-          return
-        }
-
-    // Check form settings
-        const settingsRef = doc(db, "settings", "formConfig")
-        const settingsSnap = await getDoc(settingsRef)
-        let semester = '1st Semester'
-        if (settingsSnap.exists()) {
-          setIsFormOpen(settingsSnap.data().isOpen)
-          semester = settingsSnap.data().semester || '1st Semester'
-          setCurrentSemester(semester)
-        }
-
-        // FETCH SUBJECTS FOR THE CURRENT SEMESTER
-        let semesterSubjects = []
-        try {
-          const subjectsQuery = query(
-            collection(db, "subjects"),
-            where("semester", "==", semester)
-          )
-          const subjectsSnap = await getDocs(subjectsQuery)
-          semesterSubjects = subjectsSnap.docs.map(doc => doc.data().name)
-        } catch (err) {
-          console.log("Semester query failed, fetching all subjects:", err)
-          // Fallback: fetch all subjects if query fails
-          const allSubjectsSnap = await getDocs(collection(db, "subjects"))
-          semesterSubjects = allSubjectsSnap.docs.map(doc => doc.data().name)
-        }
-
-        // FETCH PROFESSORS - Get all and filter client-side for more reliable results
-        const cleanYear = decodeURIComponent(selectedYear).trim();
-        
-        // Get all professors first
-        const allProfsSnap = await getDocs(collection(db, "professors"))
-        
-        const profList = allProfsSnap.docs.map(doc => {
-          const data = doc.data();
-          // Filter by year level
-          const hasYear = (data.assignedYears || []).includes(cleanYear);
-          // Filter subjects to only include those for the current semester
-          const filteredSubjects = hasYear ? (data.subjects || []).filter(sub => semesterSubjects.includes(sub)) : [];
-          return {
-            name: data.name,
-            image: data.imageUrl || "",
-            subjects: filteredSubjects,
-            hasYear
-          }
-        }).filter(p => p.subjects.length > 0); // Only show professors with subjects for this semester and year
-
-        setEvaluations(profList.map(p => ({
-          ...p,
-          selectedSubject: '',
-          rating: 5,
-          comment: ''
-        })))
-
-      } catch (error) {
-        console.error("Error fetching data:", error)
-      } finally {
-        setFetching(false)
+      const student = sessionData ? JSON.parse(sessionData) : null
+      
+      if (!student) {
+        router.replace('/')
+        return
       }
+      setCurrentStudent(student)
+      if (!selectedYear) {
+        router.replace('/StudentDashboard')
+        return
+      }
+      await checkStatusAndFetch(student)
     }
 
     checkAccess()
   }, [router, selectedYear])
+
+  const checkStatusAndFetch = async (student) => {
+    try {
+      const studentId = student.email.toLowerCase().trim();
+      
+      // Check if already evaluated (with error handling for missing table)
+      try {
+        const { data: statusData } = await supabase
+          .from("submissionstatus")
+          .select("*")
+          .eq("email", studentId)
+          .single()
+
+        if (statusData && statusData.hasevaluate) {
+          setHasAlreadyEvaluated(true)
+          setFetching(false)
+          return
+        }
+      } catch (e) {
+        console.log("Status check skipped")
+      }
+
+      // Check form settings
+      const { data: settingsData, error: settingsError } = await supabase
+        .from("settings")
+        .select("*")
+        .eq("id", "formConfig")
+        .single()
+
+      console.log("Settings data:", settingsData)
+      console.log("Settings error:", settingsError)
+
+      let semester = '1st Semester'
+      if (settingsData) {
+        setIsFormOpen(settingsData.isopen)
+        semester = settingsData.semester || '1st Semester'
+        setCurrentSemester(semester)
+      }
+
+      // FETCH SUBJECTS FOR THE CURRENT SEMESTER
+      let semesterSubjects = []
+      try {
+        console.log("Fetching subjects for semester:", semester)
+        const { data: subjectsData, error: subjectsError } = await supabase
+          .from("subjects")
+          .select("name")
+          .eq("semester", semester)
+
+        if (subjectsError) {
+          console.error("Subjects query error:", subjectsError)
+        }
+        console.log("Semester subjects raw data:", subjectsData)
+
+        semesterSubjects = subjectsData?.map(doc => doc.name) || []
+        console.log("Semester subjects list:", semesterSubjects)
+      } catch (err) {
+        console.log("Semester query failed, fetching all subjects:", err)
+        // Fallback: fetch all subjects if query fails
+        const { data: allSubjects } = await supabase.from("subjects").select("name")
+        semesterSubjects = allSubjects?.map(doc => doc.name) || []
+      }
+
+      // FETCH PROFESSORS - Get all and filter client-side for more reliable results
+      const cleanYear = decodeURIComponent(selectedYear).trim();
+      console.log("Selected year:", cleanYear)
+      
+      // Get all professors first
+      const { data: profsData, error: profsError } = await supabase.from("professors").select("*")
+      console.log("Professors data:", profsData)
+      console.log("Professors error:", profsError)
+      
+      const profList = (profsData || []).map(doc => {
+        const data = doc
+        
+        // Handle assignedyears - could be array, string, or null
+        let assignedYearsArray = []
+        if (Array.isArray(data.assignedyears)) {
+          assignedYearsArray = data.assignedyears
+        } else if (typeof data.assignedyears === 'string' && data.assignedyears) {
+          // Try to parse if it's a stringified array
+          try {
+            assignedYearsArray = JSON.parse(data.assignedyears)
+          } catch {
+            assignedYearsArray = [data.assignedyears] // Treat as single year
+          }
+        }
+        
+        // Handle subjects - could be array, string, or null
+        let subjectList = []
+        if (Array.isArray(data.subjects)) {
+          subjectList = data.subjects
+        } else if (typeof data.subjects === 'string' && data.subjects) {
+          try {
+            subjectList = JSON.parse(data.subjects)
+          } catch {
+            subjectList = [data.subjects] // Treat as single subject
+          }
+        }
+        
+        // Filter by year level
+        const hasYear = assignedYearsArray.includes(cleanYear)
+        
+        // Filter subjects to only include those for the current semester
+        // If no semester subjects found, show all subjects for the year
+        const filteredSubjects = (semesterSubjects.length > 0 && hasYear) 
+          ? subjectList.filter(sub => semesterSubjects.includes(sub)) 
+          : (hasYear ? subjectList : [])
+        
+        console.log(`Professor ${data.name}: assignedYears=${JSON.stringify(assignedYearsArray)}, hasYear=${hasYear}, subjects=${JSON.stringify(subjectList)}, filtered=${JSON.stringify(filteredSubjects)}`)
+        
+        return {
+          name: data.name,
+          image: data.imageurl || "",
+          subjects: filteredSubjects,
+          hasYear
+        }
+      }).filter(p => p.subjects.length > 0) // Only show professors with subjects for this year
+
+      console.log("Final professors list:", profList)
+
+      setEvaluations(profList.map(p => ({
+        ...p,
+        selectedSubject: '',
+        rating: 5,
+        comment: ''
+      })))
+
+    } catch (error) {
+      console.error("Error fetching data:", error)
+    } finally {
+      setFetching(false)
+    }
+  }
 
   const updateEval = (index, field, value) => {
     const newEvals = [...evaluations]
@@ -166,26 +222,50 @@ function EvaluationContent() {
         return
     }
     setLoading(true)
-    const batch = writeBatch(db)
     const studentId = currentStudent.email.toLowerCase().trim();
     try {
-      evaluations.forEach((item) => {
-        const docRef = doc(collection(db, "evaluations"))
-        batch.set(docRef, {
-          professorName: item.name,
-          subject: item.selectedSubject,
-          yearLevel: selectedYear,
-          rating: Number(item.rating),
-          comment: item.comment.trim() || "No comment provided",
-          submittedAt: serverTimestamp(),
-          isAnonymous: true
-        })
-      })
-      const statusRef = doc(db, "submissionStatus", studentId)
-      batch.set(statusRef, { hasEvaluate: true, EvaluateAt: serverTimestamp(), email: studentId })
-      await batch.commit()
+      // Insert evaluations
+      const evaluationsData = evaluations.map(item => ({
+        id: crypto.randomUUID(),
+        professorname: item.name,
+        subject: item.selectedSubject,
+        yearlevel: selectedYear,
+        rating: Number(item.rating),
+        comment: item.comment.trim() || "No comment provided",
+        submittedat: new Date().toISOString(),
+        isanonymous: true
+      }))
+
+      console.log("Submitting evaluations:", evaluationsData)
+
+      const { error: evalError } = await supabase
+        .from("evaluations")
+        .insert(evaluationsData)
+
+      if (evalError) {
+        console.error("Evaluation insert error:", evalError)
+        throw evalError
+      }
+
+      // Update submission status
+      console.log("Updating submission status for:", studentId)
+      const { error: statusError } = await supabase
+        .from("submissionstatus")
+        .upsert({ 
+          id: crypto.randomUUID(),
+          email: studentId, 
+          hasevaluate: true, 
+          evaluateat: new Date().toISOString() 
+        }, { onConflict: 'email' })
+
+      if (statusError) {
+        console.error("Status insert error:", statusError)
+        throw statusError
+      }
+
       showModal('success', 'Success', 'Your evaluations have been securely transmitted.', () => router.push('/StudentDashboard'))
     } catch (error) {
+      console.error("Error:", error)
       showModal('error', 'Transmission Failed', "Could not save your evaluation.")
     } finally {
       setLoading(false)

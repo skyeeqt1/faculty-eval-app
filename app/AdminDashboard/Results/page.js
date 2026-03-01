@@ -1,9 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { db } from '../../../lib/firebase'
-import { 
-  collection, onSnapshot, query, orderBy, getDocs, writeBatch, doc 
-} from 'firebase/firestore'
+import { supabase } from '../../../lib/supabase'
 
 export default function RealTimeResults() {
   const [professors, setProfessors] = useState([])
@@ -16,12 +13,33 @@ export default function RealTimeResults() {
   const [isResetting, setIsResetting] = useState(false)
 
   useEffect(() => {
-    const q = query(collection(db, "evaluations"), orderBy("submittedAt", "desc"))
-    const unsubscribeData = onSnapshot(q, (snapshot) => {
-      const allEvals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+    const channel = supabase
+      .channel('evaluations-results-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'evaluations' }, (payload) => {
+        fetchEvaluations()
+      })
+      .subscribe()
+
+    fetchEvaluations()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
+  const fetchEvaluations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("evaluations")
+        .select("*")
+        .order("submittedat", { ascending: false })
+
+      if (error) throw error
+      
+      const allEvals = data || []
       
       const grouped = allEvals.reduce((acc, curr) => {
-        const profName = curr.professorName || "Unknown Professor"
+        const profName = curr.professorname || "Unknown Professor"
         const subjectName = curr.subject || "General"
         const ratingValue = parseFloat(curr.rating) || 0
         const comment = curr.comment?.trim()
@@ -51,19 +69,32 @@ export default function RealTimeResults() {
       })).sort((a, b) => b.finalAvg - a.finalAvg)
 
       setProfessors(sortedProfessors)
+    } catch (err) {
+      console.error("Error fetching evaluations:", err)
+    } finally {
       setLoading(false)
-    })
-
-    return () => unsubscribeData()
-  }, [])
+    }
+  }
 
   const handleResetEvaluations = async () => {
     setIsResetting(true)
     try {
-      const querySnapshot = await getDocs(collection(db, "evaluations"))
-      const batch = writeBatch(db)
-      querySnapshot.forEach((document) => batch.delete(doc(db, "evaluations", document.id)))
-      await batch.commit()
+      const { error } = await supabase
+        .from("evaluations")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000")
+
+      if (error) throw error
+      
+      // Also reset submission status
+      await supabase
+        .from("submissionstatus")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000")
+      
+      // Refresh data
+      await fetchEvaluations()
+      
       setShowResetConfirm(false)
     } catch (error) {
       console.error("Reset failed:", error)
@@ -212,7 +243,7 @@ export default function RealTimeResults() {
                     <div className="flex flex-col gap-4">
                         {selectedProf.subjects[selectedSubject].comments.map((comm, idx) => (
                             <div key={idx} className="bg-white/[0.03] p-6 rounded-[1.5rem] border border-white/5 text-slate-300 text-xs leading-relaxed italic relative">
-                               <span className="text-indigo-500/20 text-4xl absolute top-2 left-3 font-serif">“</span>
+                               <span className="text-indigo-500/20 text-4xl absolute top-2 left-3 font-serif">"</span>
                                <p className="relative z-10 pl-6">{comm}</p>
                             </div>
                         ))}

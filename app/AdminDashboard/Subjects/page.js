@@ -1,10 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { db, auth } from '../../../lib/firebase' 
-import { 
-  collection, addDoc, deleteDoc, doc, 
-  onSnapshot, serverTimestamp 
-} from 'firebase/firestore'
+import { supabase } from '../../../lib/supabase' 
 
 export default function SubjectsManagement() {
   const [loading, setLoading] = useState(true)
@@ -22,24 +18,58 @@ export default function SubjectsManagement() {
   const [confirmModal, setConfirmModal] = useState({ show: false, id: null, name: '' })
 
   useEffect(() => {
-    const unsubSubs = onSnapshot(collection(db, "subjects"), (snap) => {
-      setSubjects(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })))
-      setLoading(false)
-    })
-    return () => unsubSubs()
+    // Fetch initial data
+    fetchSubjects()
+
+    // Set up realtime subscription
+    const channel = supabase
+      .channel('subjects-realtime')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'subjects' }, 
+        (payload) => {
+          console.log('Realtime change received:', payload)
+          fetchSubjects()
+        }
+      )
+      .subscribe((status) => {
+        console.log('Realtime subscription status:', status)
+      })
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
+
+  const fetchSubjects = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("subjects")
+        .select("*")
+        .order("createdat", { ascending: false })
+
+      if (error) throw error
+      setSubjects(data || [])
+    } catch (err) {
+      console.error("Error fetching subjects:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filteredSubjects = selectedFilter === 'All' 
     ? subjects 
-    : subjects.filter(sub => sub.yearLevel === selectedFilter)
+    : subjects.filter(sub => sub.yearlevel === selectedFilter)
 
   const logActivity = async (action, details) => {
     try {
-      await addDoc(collection(db, "audit_logs"), {
+      const adminEmail = sessionStorage.getItem("adminEmail") || "admintest@gmail.com"
+      const logId = crypto.randomUUID()
+      await supabase.from("audit_logs").insert({
+        id: logId,
         action: action,
-        adminEmail: auth.currentUser?.email || "admintest@gmail.com",
+        adminemail: adminEmail,
         details: details,
-        timestamp: serverTimestamp()
+        timestamp: new Date().toISOString()
       })
     } catch (err) { console.error("Log failed:", err) }
   }
@@ -47,27 +77,76 @@ export default function SubjectsManagement() {
   const handleAddSubject = async (e) => {
     e.preventDefault()
     if (!newSubName.trim()) return showToast("Subject name required")
+    
+    // Check if subject already exists with same name
+    const exists = subjects.some(s => 
+      s.name.toLowerCase() === newSubName.trim().toLowerCase()
+    )
+    if (exists) {
+      showToast("Subject name already exists")
+      return
+    }
+    
     try {
-      await addDoc(collection(db, "subjects"), {
-        name: newSubName.trim(),
-        yearLevel: newSubYear,
-        semester: newSubSemester,
-        createdAt: serverTimestamp()
-      })
+      // Generate a random UUID for the subject
+      const subjectId = crypto.randomUUID()
+      
+      const { data, error } = await supabase
+        .from("subjects")
+        .insert({
+          id: subjectId,
+          name: newSubName.trim(),
+          yearlevel: newSubYear,
+          semester: newSubSemester,
+          createdat: new Date().toISOString()
+        })
+        .select()
+
+      if (error) {
+        console.error("Supabase error:", error)
+        if (error.code === '23505') {
+          showToast("Subject already exists")
+        } else {
+          showToast(error.message || "Error adding subject")
+        }
+        return
+      }
+
+      if (!data || data.length === 0) {
+        showToast("Error: Could not add subject")
+        return
+      }
+
+      console.log("Subject added:", data)
       await logActivity("REGISTER_SUBJECT", `Added: ${newSubName.trim()} for ${newSubYear} - ${newSubSemester}`)
       setNewSubName('')
       setIsAddFormOpen(false)
       showToast("Subject Registered")
-    } catch (err) { showToast("Error adding subject") }
+      
+      // Refresh the subjects list
+      fetchSubjects()
+    } catch (err) { 
+      console.error("Error:", err)
+      showToast("Error adding subject") 
+    }
   }
 
   const confirmDelete = async () => {
     if (!confirmModal.id) return
     try {
-      await deleteDoc(doc(db, "subjects", confirmModal.id))
+      const { error } = await supabase
+        .from("subjects")
+        .delete()
+        .eq("id", confirmModal.id)
+
+      if (error) throw error
+      
       await logActivity("REMOVE_SUBJECT", `Deleted: ${confirmModal.name}`)
       setConfirmModal({ show: false, id: null, name: '' })
       showToast("Subject Removed")
+      
+      // Refresh the subjects list
+      fetchSubjects()
     } catch (err) { showToast("Delete failed") }
   }
 
@@ -214,12 +293,12 @@ export default function SubjectsManagement() {
                     <td className="p-5 md:p-6">
                       <div className="flex flex-col">
                         <span className="font-black text-slate-200 uppercase italic text-sm group-hover:text-indigo-400 transition-colors truncate">{sub.name}</span>
-                        <span className="md:hidden text-[9px] text-indigo-500 font-bold uppercase tracking-widest mt-1">{sub.yearLevel}</span>
+                        <span className="md:hidden text-[9px] text-indigo-500 font-bold uppercase tracking-widest mt-1">{sub.yearlevel}</span>
                       </div>
                     </td>
                     <td className="hidden md:table-cell p-6">
                       <span className="px-4 py-1.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/10 rounded-lg text-[10px] font-black uppercase tracking-widest">
-                        {sub.yearLevel}
+                        {sub.yearlevel}
                       </span>
                     </td>
                     <td className="p-6 text-right">
