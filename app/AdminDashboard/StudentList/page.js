@@ -12,6 +12,7 @@ export default function StudentListPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [activeYearFilter, setActiveYearFilter] = useState('All')
   const [isAddFormOpen, setIsAddFormOpen] = useState(false)
+  const [editingStudent, setEditingStudent] = useState(null)
   
   // Drawer States
   const [activeStudent, setActiveStudent] = useState(null)
@@ -23,7 +24,8 @@ export default function StudentListPage() {
     lastName: '', 
     email: '', 
     password: '',
-    yearLevel: '' 
+    yearLevel: '',
+    block: ''
   })
   
   const [confirmModal, setConfirmModal] = useState({ show: false, id: null, name: '' })
@@ -35,7 +37,8 @@ export default function StudentListPage() {
   const [generatedPassword, setGeneratedPassword] = useState('')
   const [copied, setCopied] = useState(false)
 
-  const yearLevels = ["First Year", "Second Year", "Third Year", "Fourth Year"]
+  const yearLevels = ["1st Year", "2nd Year", "3rd Year", "4th Year"]
+  const blocks = ["Blk A", "Blk B", "Blk C", "Blk D", "Blk E"]
 
   useEffect(() => {
     const q = query(collection(db, "authorized_students"), orderBy("createdAt", "desc"))
@@ -45,6 +48,23 @@ export default function StudentListPage() {
     })
     return () => unsubStudents()
   }, [])
+
+  // Populate form when editing a student
+  useEffect(() => {
+    if (editingStudent) {
+      setNewStudent({
+        firstName: editingStudent.firstName || '',
+        lastName: editingStudent.lastName || '',
+        email: editingStudent.email || '',
+        password: '', // Don't show actual password for privacy
+        yearLevel: editingStudent.yearLevel || '',
+        block: editingStudent.block || ''
+      })
+    } else {
+      // Reset form when closing
+      setNewStudent({ firstName: '', lastName: '', email: '', password: '', yearLevel: '', block: '' })
+    }
+  }, [editingStudent])
 
   const logActivity = async (action, details) => {
     try {
@@ -71,26 +91,51 @@ export default function StudentListPage() {
 
   const handleAddStudent = async (e) => {
     e.preventDefault()
-    if (!newStudent.firstName || !newStudent.lastName || !newStudent.email || !newStudent.password || !newStudent.yearLevel) {
+    if (!newStudent.firstName || !newStudent.lastName || !newStudent.email || !newStudent.yearLevel || !newStudent.block) {
       return showToast("All fields are required")
+    }
+    if (!editingStudent && !newStudent.password) {
+      return showToast("Password is required for new students")
     }
     try {
       const studentName = `${newStudent.firstName.trim()} ${newStudent.lastName.trim()}`
-      await addDoc(collection(db, "authorized_students"), {
-        firstName: newStudent.firstName.trim(),
-        lastName: newStudent.lastName.trim(),
-        email: newStudent.email.trim().toLowerCase(),
-        password: newStudent.password,
-        yearLevel: newStudent.yearLevel,
-        mustChangePassword: true,
-        hasEvaluate: false,
-        createdAt: serverTimestamp()
-      })
-      await logActivity("REGISTER_STUDENT", `Registered: ${studentName} (${newStudent.yearLevel})`)
-      setNewStudent({ firstName: '', lastName: '', email: '', password: '', yearLevel: '' })
+      
+      if (editingStudent) {
+        // Update existing student
+        const updateData = {
+          firstName: newStudent.firstName.trim(),
+          lastName: newStudent.lastName.trim(),
+          email: newStudent.email.trim().toLowerCase(),
+          yearLevel: newStudent.yearLevel,
+          block: newStudent.block
+        }
+        // Only update password if a new one is provided
+        if (newStudent.password) {
+          updateData.password = newStudent.password
+        }
+        await updateDoc(doc(db, "authorized_students", editingStudent.id), updateData)
+        await logActivity("UPDATE_STUDENT", `Updated: ${studentName} (${newStudent.yearLevel} - ${newStudent.block})`)
+        setEditingStudent(null)
+        showToast("Student Updated")
+      } else {
+        // Add new student
+        await addDoc(collection(db, "authorized_students"), {
+          firstName: newStudent.firstName.trim(),
+          lastName: newStudent.lastName.trim(),
+          email: newStudent.email.trim().toLowerCase(),
+          password: newStudent.password,
+          yearLevel: newStudent.yearLevel,
+          block: newStudent.block,
+          mustChangePassword: true,
+          hasEvaluate: false,
+          createdAt: serverTimestamp()
+        })
+        await logActivity("REGISTER_STUDENT", `Registered: ${studentName} (${newStudent.yearLevel} - ${newStudent.block})`)
+        showToast("Student Registered")
+      }
+      setNewStudent({ firstName: '', lastName: '', email: '', password: '', yearLevel: '', block: '' })
       setIsAddFormOpen(false)
-      showToast("Student Registered")
-    } catch (err) { showToast("Error adding student") }
+    } catch (err) { showToast("Action failed") }
   }
 
   const executeGlobalVoteReset = async () => {
@@ -122,7 +167,8 @@ export default function StudentListPage() {
       await logActivity("PASSWORD_RESET", `Generated temp password for ${student.firstName} ${student.lastName}`)
       setGeneratedPassword(tempPassword)
       setResetConfirmModal({ show: false, student: null })
-      handleCloseDrawer()
+      setIsAddFormOpen(false)
+      setEditingStudent(null)
     } catch (err) { showToast("Reset failed") }
   }
 
@@ -196,10 +242,10 @@ export default function StudentListPage() {
           <section className="w-full max-w-2xl bg-slate-900 border border-indigo-500/30 p-8 rounded-[2.5rem] shadow-2xl animate-in zoom-in-95 duration-300">
             <div className="flex justify-between items-center mb-8">
               <div>
-                <h3 className="text-xl font-black text-white uppercase italic tracking-tight">Register New Student</h3>
-                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-1">Authorized access provision</p>
+                <h3 className="text-xl font-black text-white uppercase italic tracking-tight">{editingStudent ? 'Edit Student' : 'Register New Student'}</h3>
+                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-1">{editingStudent ? 'Update student details' : 'Authorized access provision'}</p>
               </div>
-              <button onClick={() => setIsAddFormOpen(false)} className="text-slate-500 hover:text-white transition-colors">
+              <button onClick={() => { setIsAddFormOpen(false); setEditingStudent(null); }} className="text-slate-500 hover:text-white transition-colors">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -216,7 +262,7 @@ export default function StudentListPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <label className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] ml-1">Academic Year</label>
                   <select value={newStudent.yearLevel} onChange={(e) => setNewStudent({...newStudent, yearLevel: e.target.value})} className="w-full bg-slate-800 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white appearance-none cursor-pointer">
@@ -225,29 +271,48 @@ export default function StudentListPage() {
                   </select>
                 </div>
                 <div className="space-y-2">
+                  <label className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] ml-1">Block</label>
+                  <select value={newStudent.block} onChange={(e) => setNewStudent({...newStudent, block: e.target.value})} className="w-full bg-slate-800 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white appearance-none cursor-pointer">
+                    <option value="" disabled>SELECT BLOCK</option>
+                    {blocks.map(blk => <option key={blk} value={blk} className="bg-slate-900">{blk.toUpperCase()}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-2">
                   <label className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] ml-1">Email Address</label>
                   <input type="email" placeholder="Email Address" value={newStudent.email} onChange={(e) => setNewStudent({...newStudent, email: e.target.value})} className="w-full bg-slate-800 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white"/>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] ml-1">Security Password</label>
-                <div className="flex gap-2">
-                  <input type="text" placeholder="Password" value={newStudent.password} onChange={(e) => setNewStudent({...newStudent, password: e.target.value})} className="flex-1 bg-slate-800 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white"/>
-                  <button type="button" onClick={() => {
-                    const charset = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-                    let pwd = "";
-                    for (let i = 0; i < 10; i++) pwd += charset.charAt(Math.floor(Math.random() * charset.length))
-                    setNewStudent({ ...newStudent, password: pwd })
-                  }} className="p-4 bg-indigo-600/10 text-indigo-400 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              {!editingStudent && (
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] ml-1">Security Password</label>
+                  <div className="flex gap-2">
+                    <input type="text" placeholder="Password" value={newStudent.password} onChange={(e) => setNewStudent({...newStudent, password: e.target.value})} className="flex-1 bg-slate-800 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white"/>
+                    <button type="button" onClick={() => {
+                      const charset = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+                      let pwd = "";
+                      for (let i = 0; i < 10; i++) pwd += charset.charAt(Math.floor(Math.random() * charset.length))
+                      setNewStudent({ ...newStudent, password: pwd })
+                    }} className="p-4 bg-indigo-600/10 text-indigo-400 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {editingStudent && (
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] ml-1">Password Management</label>
+                  <button type="button" onClick={() => setResetConfirmModal({ show: true, student: editingStudent })} className="w-full py-4 bg-slate-800 border border-white/5 text-slate-400 font-black text-[10px] uppercase tracking-widest rounded-2xl hover:bg-emerald-600 hover:text-white hover:border-emerald-500 transition-all cursor-pointer flex items-center justify-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    Reset Password
                   </button>
                 </div>
-              </div>
+              )}
 
               <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setIsAddFormOpen(false)} className="flex-1 py-4 bg-slate-800 text-slate-400 font-black text-[10px] uppercase tracking-widest rounded-2xl hover:bg-slate-700">Discard</button>
-                <button type="submit" className="flex-[2] py-4 bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 active:scale-95 transition-all">Grant Access</button>
+                <button type="button" onClick={() => { setIsAddFormOpen(false); setEditingStudent(null); }} className="flex-1 py-4 bg-slate-800 text-slate-400 font-black text-[10px] uppercase tracking-widest rounded-2xl hover:bg-slate-700">Discard</button>
+                <button type="submit" className="flex-[2] py-4 bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 active:scale-95 transition-all">{editingStudent ? 'Update Student' : 'Grant Access'}</button>
               </div>
             </form>
           </section>
@@ -332,8 +397,10 @@ export default function StudentListPage() {
                     <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{s.email}</span>
                   </td>
                   <td className="p-6 text-right">
-                    <div className="flex items-center justify-end gap-3">
-                      <button onClick={(e) => { e.stopPropagation(); setResetConfirmModal({ show: true, student: s }) }} className="hidden md:block px-4 py-2 bg-slate-800 text-slate-400 rounded-lg text-[9px] font-black uppercase tracking-widest cursor-pointer hover:bg-indigo-600 hover:text-white transition-all">Reset PWD</button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button onClick={(e) => { e.stopPropagation(); setEditingStudent(s); setIsAddFormOpen(true); }} className="p-3 text-indigo-500 hover:bg-indigo-500/10 rounded-xl transition-all cursor-pointer">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                      </button>
                       <button onClick={(e) => { e.stopPropagation(); setConfirmModal({ show: true, id: s.id, name: `${s.firstName} ${s.lastName}` }) }} className="p-3 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all cursor-pointer">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>

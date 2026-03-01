@@ -93,3 +93,16 @@ body {
   padding-bottom: var(--sab);
 
 }
+
+/* Button hover pointer cursor */
+button:hover {
+  cursor: pointer;
+}
+
+/* All clickable elements should have pointer cursor on hover */
+button:hover,
+a:hover,
+select:hover,
+[role="button"]:hover {
+  cursor: pointer;
+}

@@ -3,15 +3,18 @@ import { useRouter } from 'next/navigation'
 import { auth, db } from '../../lib/firebase' 
 import { useState, useEffect, useCallback } from 'react'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
-import { doc, onSnapshot, getDoc } from 'firebase/firestore'
+import { doc, onSnapshot, getDoc, collection, query, where, getDocs } from 'firebase/firestore'
 
 export default function StudentPage() {
   const router = useRouter()
   const [userName, setUserName] = useState('Student')
   const [loading, setLoading] = useState(true)
   const [isFormOpen, setIsFormOpen] = useState(true)
-  const [yearLevel, setYearLevel] = useState('')
+  const [yearLevel, setYearLevel] = useState(null)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
+  const [studentData, setStudentData] = useState(null)
+  const [block, setBlock] = useState(null)
+  const [semester, setSemester] = useState('1st Semester')
 
   // BACK BUTTON INTERCEPTION
   const handlePopState = useCallback((e) => {
@@ -32,6 +35,8 @@ export default function StudentPage() {
     if (savedSession) {
       const data = JSON.parse(savedSession)
       setUserName(data.firstName || 'Student')
+      setYearLevel(data.yearLevel || null)
+      setBlock(data.block || null)
       setLoading(false) // Data is found, stop the loading screen
     }
 
@@ -43,12 +48,27 @@ export default function StudentPage() {
           return
         }
         
-        // Sync name from Firestore if Firebase user exists
+        // Sync name and year level from Firestore if Firebase user exists
         try {
-          const userDocRef = doc(db, "authorized_students", user.email.toLowerCase())
-          const userSnap = await getDoc(userDocRef)
-          if (userSnap.exists()) {
-            setUserName(userSnap.data().firstName || userSnap.data().name)
+          // Query by email field, not document ID
+          const studentsRef = collection(db, "authorized_students")
+          const q = query(studentsRef, where("email", "==", user.email.toLowerCase()))
+          const querySnapshot = await getDocs(q)
+          if (!querySnapshot.empty) {
+            const userDoc = querySnapshot.docs[0]
+            const data = userDoc.data()
+            setUserName(data.firstName || data.name)
+            setYearLevel(data.yearLevel || null)
+            setBlock(data.block || null)
+            setStudentData(data)
+            // Store session data including year level and block
+            sessionStorage.setItem("studentSession", JSON.stringify({
+              firstName: data.firstName,
+              lastName: data.lastName,
+              email: data.email,
+              yearLevel: data.yearLevel,
+              block: data.block
+            }))
           }
         } catch (error) { console.error(error) }
         setLoading(false)
@@ -63,6 +83,7 @@ export default function StudentPage() {
     const unsubscribeStatus = onSnapshot(doc(db, "settings", "formConfig"), (snapshot) => {
       if (snapshot.exists()) {
         setIsFormOpen(snapshot.data().isOpen)
+        setSemester(snapshot.data().semester || '1st Semester')
       }
     })
 
@@ -139,7 +160,7 @@ export default function StudentPage() {
         <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="flex md:hidden items-center gap-3 px-4 py-3 bg-slate-900/50 border border-white/5 rounded-2xl flex-1 justify-center">
             <div className={`w-2 h-2 rounded-full ${isFormOpen ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
-            <span className="text-[9px] font-black text-white uppercase tracking-widest">{isFormOpen ? "Opened" : "Closed"}</span>
+            <span className="text-[9px] font-black text-white uppercase tracking-widest">{isFormOpen ? `Opened - ${semester}` : "Closed"}</span>
           </div>
           <button onClick={() => setShowLogoutModal(true)} className="cursor-pointer flex items-center gap-3 px-6 py-3 bg-slate-900 border border-white/10 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-rose-400 transition-all active:scale-95 flex-1 md:flex-none justify-center">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
@@ -151,26 +172,32 @@ export default function StudentPage() {
       <div className={`w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 z-10 transition-all duration-300 ${showLogoutModal ? 'blur-md scale-[0.98]' : ''}`}>
         <div className="lg:col-span-8 space-y-8">
           
-          {/* Step 01: Academic Year */}
+          {/* Step 01: Student Info - Auto-detected from account */}
           <div className="bg-slate-900 rounded-[2.5rem] border border-white/5 p-8 md:p-10 shadow-2xl">
             <h3 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
                 <span className="w-6 h-6 rounded-lg bg-indigo-500/10 flex items-center justify-center text-[10px]">01</span>
-                Select Academic Year
+                Student Information
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {['1st Year', '2nd Year', '3rd Year', '4th Year'].map((year) => (
-                <button
-                  key={year}
-                  onClick={() => setYearLevel(year)}
-                  className={`cursor-pointer py-4 px-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all border-2 ${
-                    yearLevel === year 
-                    ? 'border-indigo-600 bg-indigo-600/10 text-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.1)]' 
-                    : 'border-slate-800 bg-slate-800/50 text-slate-500 hover:border-slate-700'
-                  }`}
-                >
-                  {year}
-                </button>
-              ))}
+            <div className="bg-slate-950/50 rounded-2xl p-6 border border-white/5">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-indigo-600/20 flex items-center justify-center border border-indigo-500/30">
+                    <svg className="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-1">Year Level</p>
+                    <p className="text-lg font-black text-white uppercase">{yearLevel || 'Loading...'}</p>
+                    {block && (
+                      <p className="text-xs font-bold text-indigo-400 mt-1 uppercase">{block}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="px-4 py-2 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+                  <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Auto-Detected</p>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -192,7 +219,7 @@ export default function StudentPage() {
               onClick={() => router.push(`/Evaluation?year=${encodeURIComponent(yearLevel)}`)}
               className="cursor-pointer group flex items-center justify-center w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-black py-5 px-12 rounded-2xl transition-all shadow-lg shadow-indigo-600/20 uppercase text-[11px] tracking-[0.2em]"
             >
-              {!yearLevel ? "Identify Year Level First" : "Launch Evaluation"}
+              {!yearLevel ? "Loading Year Level..." : "Launch Evaluation"}
               <svg className="w-5 h-5 ml-3 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
             </button>
           </div>

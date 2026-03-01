@@ -6,9 +6,12 @@ import { doc, getDoc, setDoc, collection, onSnapshot, query } from 'firebase/fir
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [isFormOpen, setIsFormOpen] = useState(true)
+  const [semester, setSemester] = useState('1st Semester')
   const [toast, setToast] = useState({ show: false, message: '' })
   const [confirmModal, setConfirmModal] = useState({ show: false, title: '', onConfirm: null })
   const [ranking, setRanking] = useState([])
+
+  const semesters = ['1st Semester', '2nd Semester']
 
   useEffect(() => {
     fetchSettings()
@@ -42,7 +45,10 @@ export default function AdminDashboard() {
   const fetchSettings = async () => {
     try {
       const docSnap = await getDoc(doc(db, "settings", "formConfig"))
-      if (docSnap.exists()) setIsFormOpen(docSnap.data().isOpen)
+      if (docSnap.exists()) {
+        setIsFormOpen(docSnap.data().isOpen)
+        setSemester(docSnap.data().semester || '1st Semester')
+      }
     } catch (err) { console.error("Error fetching settings:", err) }
   }
 
@@ -50,14 +56,21 @@ export default function AdminDashboard() {
     const nextStatus = !isFormOpen;
     setConfirmModal({
       show: true,
-      title: `Switch evaluation portal to ${nextStatus ? 'LIVE' : 'OFFLINE'}?`,
+      title: `Switch evaluation portal to ${nextStatus ? 'LIVE' : 'OFFLINE'} for ${semester}?`,
       onConfirm: async () => {
-        await setDoc(doc(db, "settings", "formConfig"), { isOpen: nextStatus, updatedAt: new Date() });
+        await setDoc(doc(db, "settings", "formConfig"), { isOpen: nextStatus, semester: semester, updatedAt: new Date() });
         setIsFormOpen(nextStatus);
-        setToast({ show: true, message: `System: ${nextStatus ? 'Live' : 'Offline'}` });
+        setToast({ show: true, message: `System: ${nextStatus ? 'Live' : 'Offline'} for ${semester}` });
         setTimeout(() => setToast({ show: false, message: '' }), 2000);
       }
     });
+  }
+
+  const handleSemesterChange = async (newSemester) => {
+    setSemester(newSemester)
+    await setDoc(doc(db, "settings", "formConfig"), { isOpen: isFormOpen, semester: newSemester, updatedAt: new Date() });
+    setToast({ show: true, message: `Semester set to ${newSemester}` });
+    setTimeout(() => setToast({ show: false, message: '' }), 2000);
   }
 
   if (loading) return (
@@ -83,9 +96,20 @@ export default function AdminDashboard() {
           <h2 className={`text-xl font-black uppercase italic ${isFormOpen ? 'text-emerald-500' : 'text-slate-300'}`}>System Status: {isFormOpen ? 'Live' : 'Offline'}</h2>
           <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1">Evaluation portal is currently {isFormOpen ? 'accepting' : 'blocking'} student submissions.</p>
         </div>
-        <button onClick={togglePortal} className={`px-10 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest active:scale-95 cursor-pointer transition-all ${isFormOpen ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'bg-slate-800 text-slate-400 hover:text-slate-200'}`}>
-          {isFormOpen ? 'Close Portal' : 'Open Portal'}
-        </button>
+        <div className="flex flex-col md:flex-row gap-3">
+          <select 
+            value={semester} 
+            onChange={(e) => handleSemesterChange(e.target.value)}
+            className="bg-slate-800 border border-white/10 rounded-2xl px-6 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white cursor-pointer"
+          >
+            {semesters.map(sem => (
+              <option key={sem} value={sem} className="bg-slate-900">{sem.toUpperCase()}</option>
+            ))}
+          </select>
+          <button onClick={togglePortal} className={`px-10 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest active:scale-95 cursor-pointer transition-all ${isFormOpen ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'bg-slate-800 text-slate-400 hover:text-slate-200'}`}>
+            {isFormOpen ? 'Close Portal' : 'Open Portal'}
+          </button>
+        </div>
       </section>
 
       {/* Ranking Section */}

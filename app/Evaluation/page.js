@@ -28,6 +28,7 @@ function EvaluationContent() {
   const [isFormOpen, setIsFormOpen] = useState(true)
   const [hasAlreadyEvaluated, setHasAlreadyEvaluated] = useState(false)
   const [currentStudent, setCurrentStudent] = useState(null)
+  const [currentSemester, setCurrentSemester] = useState('1st Semester')
   
   const [modalConfig, setModalConfig] = useState({ 
     isOpen: false, 
@@ -83,29 +84,48 @@ function EvaluationContent() {
     // Check form settings
         const settingsRef = doc(db, "settings", "formConfig")
         const settingsSnap = await getDoc(settingsRef)
+        let semester = '1st Semester'
         if (settingsSnap.exists()) {
           setIsFormOpen(settingsSnap.data().isOpen)
+          semester = settingsSnap.data().semester || '1st Semester'
+          setCurrentSemester(semester)
         }
 
-        // FETCH PROFESSORS
+        // FETCH SUBJECTS FOR THE CURRENT SEMESTER
+        let semesterSubjects = []
+        try {
+          const subjectsQuery = query(
+            collection(db, "subjects"),
+            where("semester", "==", semester)
+          )
+          const subjectsSnap = await getDocs(subjectsQuery)
+          semesterSubjects = subjectsSnap.docs.map(doc => doc.data().name)
+        } catch (err) {
+          console.log("Semester query failed, fetching all subjects:", err)
+          // Fallback: fetch all subjects if query fails
+          const allSubjectsSnap = await getDocs(collection(db, "subjects"))
+          semesterSubjects = allSubjectsSnap.docs.map(doc => doc.data().name)
+        }
+
+        // FETCH PROFESSORS - Get all and filter client-side for more reliable results
         const cleanYear = decodeURIComponent(selectedYear).trim();
         
-        // Query assigned years
-        const profQuery = query(
-          collection(db, "professors"), 
-          where("assignedYears", "array-contains", cleanYear) 
-        )
+        // Get all professors first
+        const allProfsSnap = await getDocs(collection(db, "professors"))
         
-        const querySnapshot = await getDocs(profQuery)
-
-        const profList = querySnapshot.docs.map(doc => {
+        const profList = allProfsSnap.docs.map(doc => {
           const data = doc.data();
+          // Filter by year level
+          const hasYear = (data.assignedYears || []).includes(cleanYear);
+          // Filter subjects to only include those for the current semester
+          const filteredSubjects = hasYear ? (data.subjects || []).filter(sub => semesterSubjects.includes(sub)) : [];
           return {
             name: data.name,
             image: data.imageUrl || "",
-            subjects: data.subjects || []
+            subjects: filteredSubjects,
+            hasYear
           }
-        })
+        }).filter(p => p.subjects.length > 0); // Only show professors with subjects for this semester and year
 
         setEvaluations(profList.map(p => ({
           ...p,

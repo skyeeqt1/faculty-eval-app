@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { db, auth } from '../../../lib/firebase'
 import { 
   collection, addDoc, deleteDoc, doc, 
-  onSnapshot, serverTimestamp, query, where, getDocs 
+  onSnapshot, serverTimestamp, query, where, getDocs, updateDoc 
 } from 'firebase/firestore'
 
 export default function FacultyManagement() {
@@ -11,6 +11,9 @@ export default function FacultyManagement() {
   const [isAddFormOpen, setIsAddFormOpen] = useState(false)
   const [professors, setProfessors] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
+  
+  // States for editing
+  const [editingProf, setEditingProf] = useState(null)
   
   // States for Subjects
   const [availableSubjects, setAvailableSubjects] = useState([])
@@ -26,6 +29,22 @@ export default function FacultyManagement() {
   const [selectedYears, setSelectedYears] = useState([]) 
 
   const yearOptions = ["1st Year", "2nd Year", "3rd Year", "4th Year"]
+
+  // Populate form when editing a professor
+  useEffect(() => {
+    if (editingProf) {
+      setName(editingProf.name || '')
+      setImageUrl(editingProf.imageUrl || '')
+      setSelectedYears(editingProf.assignedYears || [])
+      setSelectedSubjects(editingProf.subjects || [])
+    } else {
+      // Reset form when closing
+      setName('')
+      setImageUrl('')
+      setSelectedYears([])
+      setSelectedSubjects([])
+    }
+  }, [editingProf])
 
   // Listen to Professors List
   useEffect(() => {
@@ -94,18 +113,32 @@ export default function FacultyManagement() {
     if (selectedSubjects.length === 0) return showToast("Select at least one Subject")
 
     try {
-      await addDoc(collection(db, "professors"), {
-        name: name.trim(),
-        imageUrl: imageUrl.trim() || null,
-        assignedYears: selectedYears,
-        subjects: selectedSubjects,
-        createdAt: serverTimestamp()
-      })
-      await logActivity("REGISTER_INSTRUCTOR", `Registered: ${name.trim()}`)
+      if (editingProf) {
+        // Update existing professor
+        await updateDoc(doc(db, "professors", editingProf.id), {
+          name: name.trim(),
+          imageUrl: imageUrl.trim() || null,
+          assignedYears: selectedYears,
+          subjects: selectedSubjects
+        })
+        await logActivity("UPDATE_INSTRUCTOR", `Updated: ${name.trim()}`)
+        setEditingProf(null)
+        showToast("Instructor Updated")
+      } else {
+        // Add new professor
+        await addDoc(collection(db, "professors"), {
+          name: name.trim(),
+          imageUrl: imageUrl.trim() || null,
+          assignedYears: selectedYears,
+          subjects: selectedSubjects,
+          createdAt: serverTimestamp()
+        })
+        await logActivity("REGISTER_INSTRUCTOR", `Registered: ${name.trim()}`)
+        showToast("Instructor Registered")
+      }
       setName(''); setImageUrl(''); setSelectedYears([]); setSelectedSubjects([]);
       setIsAddFormOpen(false)
-      showToast("Instructor Registered")
-    } catch (err) { showToast("Registration failed") }
+    } catch (err) { showToast("Action failed") }
   }
 
   const confirmDelete = async () => {
@@ -168,8 +201,11 @@ export default function FacultyManagement() {
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <section className="w-full max-w-2xl bg-slate-900 border border-indigo-500/30 p-8 rounded-[2.5rem] shadow-2xl overflow-y-auto max-h-[90vh] custom-scrollbar">
             <div className="flex justify-between items-center mb-8">
-              <h3 className="text-xl font-black text-white uppercase italic tracking-tight">Register Instructor</h3>
-              <button onClick={() => setIsAddFormOpen(false)} className="text-slate-500 hover:text-white cursor-pointer"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg></button>
+              <div>
+                <h3 className="text-xl font-black text-white uppercase italic tracking-tight">{editingProf ? 'Edit Instructor' : 'Register Instructor'}</h3>
+                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-1">{editingProf ? 'Update instructor details' : 'Add new faculty member'}</p>
+              </div>
+              <button onClick={() => { setIsAddFormOpen(false); setEditingProf(null); }} className="text-slate-500 hover:text-white cursor-pointer"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg></button>
             </div>
 
             <form onSubmit={handleAddFaculty} className="space-y-6">
@@ -223,8 +259,8 @@ export default function FacultyManagement() {
               </div>
 
               <div className="flex gap-3 pt-12">
-                <button type="button" onClick={() => setIsAddFormOpen(false)} className="flex-1 py-4 bg-slate-800 text-slate-400 font-black text-[10px] uppercase rounded-2xl cursor-pointer">Discard</button>
-                <button type="submit" className="flex-[2] py-4 bg-indigo-600 text-white font-black text-[10px] uppercase rounded-2xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer">Confirm Faculty</button>
+                <button type="button" onClick={() => { setIsAddFormOpen(false); setEditingProf(null); }} className="flex-1 py-4 bg-slate-800 text-slate-400 font-black text-[10px] uppercase rounded-2xl cursor-pointer">Discard</button>
+                <button type="submit" className="flex-[2] py-4 bg-indigo-600 text-white font-black text-[10px] uppercase rounded-2xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer">{editingProf ? 'Update Faculty' : 'Confirm Faculty'}</button>
               </div>
             </form>
           </section>
@@ -264,9 +300,14 @@ export default function FacultyManagement() {
                     </div>
                   </td>
                   <td className="p-6 text-right">
-                    <button onClick={() => setConfirmModal({ show: true, id: prof.id, name: prof.name })} className="p-3 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all cursor-pointer">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button onClick={() => { setEditingProf(prof); setIsAddFormOpen(true); }} className="p-3 text-indigo-500 hover:bg-indigo-500/10 rounded-xl transition-all cursor-pointer">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                      </button>
+                      <button onClick={() => setConfirmModal({ show: true, id: prof.id, name: prof.name })} className="p-3 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all cursor-pointer">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

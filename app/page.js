@@ -70,6 +70,9 @@ export default function LoginPage() {
           sessionStorage.setItem("studentSession", JSON.stringify({
             email: studentData.email,
             firstName: studentData.firstName,
+            lastName: studentData.lastName,
+            yearLevel: studentData.yearLevel,
+            block: studentData.block,
             id: studentDoc.id
           }))
 

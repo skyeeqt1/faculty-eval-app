@@ -11,10 +11,12 @@ export default function SubjectsManagement() {
   const [subjects, setSubjects] = useState([])
   const [newSubName, setNewSubName] = useState('')
   const [newSubYear, setNewSubYear] = useState('1st Year')
+  const [newSubSemester, setNewSubSemester] = useState('1st Semester')
   const [isAddFormOpen, setIsAddFormOpen] = useState(false)
   
   const [selectedFilter, setSelectedFilter] = useState('All')
   const yearLevels = ['All', '1st Year', '2nd Year', '3rd Year', '4th Year']
+  const semesters = ['1st Semester', '2nd Semester']
 
   const [toast, setToast] = useState({ show: false, message: '' })
   const [confirmModal, setConfirmModal] = useState({ show: false, id: null, name: '' })
@@ -49,9 +51,10 @@ export default function SubjectsManagement() {
       await addDoc(collection(db, "subjects"), {
         name: newSubName.trim(),
         yearLevel: newSubYear,
+        semester: newSubSemester,
         createdAt: serverTimestamp()
       })
-      await logActivity("REGISTER_SUBJECT", `Added: ${newSubName.trim()} for ${newSubYear}`)
+      await logActivity("REGISTER_SUBJECT", `Added: ${newSubName.trim()} for ${newSubYear} - ${newSubSemester}`)
       setNewSubName('')
       setIsAddFormOpen(false)
       showToast("Subject Registered")
@@ -129,6 +132,18 @@ export default function SubjectsManagement() {
                   >
                     {yearLevels.filter(y => y !== 'All').map(year => (
                       <option key={year} value={year} className="bg-slate-900">{year.toUpperCase()}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="group">
+                  <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1 mb-2 block">Semester</label>
+                  <select 
+                    value={newSubSemester} onChange={(e) => setNewSubSemester(e.target.value)}
+                    className="w-full bg-slate-800/50 border border-white/5 rounded-2xl px-6 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white cursor-pointer transition-all group-hover:bg-slate-800"
+                  >
+                    {semesters.map(sem => (
+                      <option key={sem} value={sem} className="bg-slate-900">{sem.toUpperCase()}</option>
                     ))}
                   </select>
                 </div>
