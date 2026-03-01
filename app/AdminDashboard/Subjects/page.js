@@ -199,7 +199,7 @@ export default function SubjectsManagement() {
                   <input 
                     type="text" placeholder="Subject Name" value={newSubName} 
                     onChange={(e) => setNewSubName(e.target.value)} 
-                    className="w-full bg-slate-800/50 border border-white/5 rounded-2xl px-6 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white transition-all group-hover:bg-slate-800"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-6 py-4 text-sm outline-none text-white focus:border-indigo-500 transition-all group-hover:bg-slate-800"
                   />
                 </div>
 
@@ -207,7 +207,7 @@ export default function SubjectsManagement() {
                   <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1 mb-2 block">Year Level Assignment</label>
                   <select 
                     value={newSubYear} onChange={(e) => setNewSubYear(e.target.value)}
-                    className="w-full bg-slate-800/50 border border-white/5 rounded-2xl px-6 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white cursor-pointer transition-all group-hover:bg-slate-800"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-6 py-4 text-sm outline-none text-white focus:border-indigo-500 cursor-pointer transition-all group-hover:bg-slate-800"
                   >
                     {yearLevels.filter(y => y !== 'All').map(year => (
                       <option key={year} value={year} className="bg-slate-900">{year.toUpperCase()}</option>
@@ -219,7 +219,7 @@ export default function SubjectsManagement() {
                   <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1 mb-2 block">Semester</label>
                   <select 
                     value={newSubSemester} onChange={(e) => setNewSubSemester(e.target.value)}
-                    className="w-full bg-slate-800/50 border border-white/5 rounded-2xl px-6 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white cursor-pointer transition-all group-hover:bg-slate-800"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-6 py-4 text-sm outline-none text-white focus:border-indigo-500 cursor-pointer transition-all group-hover:bg-slate-800"
                   >
                     {semesters.map(sem => (
                       <option key={sem} value={sem} className="bg-slate-900">{sem.toUpperCase()}</option>
@@ -247,7 +247,7 @@ export default function SubjectsManagement() {
           <select 
             value={selectedFilter}
             onChange={(e) => setSelectedFilter(e.target.value)}
-            className="w-full bg-slate-900 text-white border border-white/10 rounded-2xl px-6 py-4 text-[10px] font-black uppercase tracking-widest appearance-none outline-none focus:border-indigo-500"
+            className="w-full bg-slate-900 text-white border border-slate-700 rounded-2xl px-6 py-4 text-sm appearance-none outline-none focus:border-indigo-500"
           >
             {yearLevels.map((year) => (
               <option key={year} value={year} className="bg-slate-900 text-white">FILTER: {year.toUpperCase()}</option>

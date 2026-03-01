@@ -316,7 +316,7 @@ export default function FacultyManagement() {
         <input 
           type="text" placeholder="Search instructors..." 
           value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} 
-          className="w-full bg-slate-900/50 border border-white/5 p-5 rounded-2xl outline-none text-white text-xs font-bold uppercase tracking-widest focus:border-indigo-500/50 transition-all shadow-inner"
+          className="w-full bg-slate-900/50 border border-slate-700 p-5 rounded-2xl outline-none text-white text-sm focus:border-indigo-500/50 transition-all shadow-inner"
         />
       </div>
 
@@ -376,7 +376,7 @@ export default function FacultyManagement() {
               {/* TEXT DETAILS BELOW */}
               <div className="space-y-2">
                 <label className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] ml-1">Full Name</label>
-                <input type="text" placeholder="Enter full name" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-slate-800 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold uppercase tracking-widest outline-none text-white focus:border-indigo-500"/>
+                <input type="text" placeholder="Enter full name" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-sm outline-none text-white focus:border-indigo-500 transition-all"/>
               </div>
 
               <div className="space-y-3">
@@ -397,7 +397,7 @@ export default function FacultyManagement() {
                   </div>
                 ) : (
                   <div className="relative">
-                    <button type="button" onClick={() => setIsSubjectDropdownOpen(!isSubjectDropdownOpen)} className="w-full bg-slate-800 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold uppercase tracking-widest text-left text-white flex justify-between items-center hover:border-indigo-500 transition-all cursor-pointer">
+                    <button type="button" onClick={() => setIsSubjectDropdownOpen(!isSubjectDropdownOpen)} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-sm text-left text-white flex justify-between items-center hover:border-indigo-500 transition-all cursor-pointer">
                       <span className="truncate">{Array.isArray(selectedSubjects) && selectedSubjects.length > 0 ? selectedSubjects.join(", ") : "-- Select Subjects --"}</span>
                       <svg className={`w-4 h-4 transition-transform ${isSubjectDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"/></svg>
                     </button>

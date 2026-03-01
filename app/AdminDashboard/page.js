@@ -175,7 +175,7 @@ export default function AdminDashboard() {
           <select 
             value={semester} 
             onChange={(e) => handleSemesterChange(e.target.value)}
-            className="bg-slate-800 border border-white/10 rounded-2xl px-6 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white cursor-pointer"
+            className="bg-slate-800 border border-slate-700 rounded-2xl px-6 py-4 text-sm outline-none text-white focus:border-indigo-500 cursor-pointer transition-all"
           >
             {semesters.map(sem => (
               <option key={sem} value={sem} className="bg-slate-900">{sem.toUpperCase()}</option>

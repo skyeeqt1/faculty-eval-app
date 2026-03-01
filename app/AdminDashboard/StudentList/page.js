@@ -338,32 +338,32 @@ export default function StudentListPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] ml-1">First Name</label>
-                  <input type="text" placeholder="First Name" value={newStudent.firstName} onChange={(e) => setNewStudent({...newStudent, firstName: e.target.value})} className="w-full bg-slate-800 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white"/>
+                  <input type="text" placeholder="First Name" value={newStudent.firstName} onChange={(e) => setNewStudent({...newStudent, firstName: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-sm outline-none text-white focus:border-indigo-500 transition-all"/>
                 </div>
                 <div className="space-y-2">
                   <label className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] ml-1">Last Name</label>
-                  <input type="text" placeholder="Last Name" value={newStudent.lastName} onChange={(e) => setNewStudent({...newStudent, lastName: e.target.value})} className="w-full bg-slate-800 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white"/>
+                  <input type="text" placeholder="Last Name" value={newStudent.lastName} onChange={(e) => setNewStudent({...newStudent, lastName: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-sm outline-none text-white focus:border-indigo-500 transition-all"/>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <label className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] ml-1">Academic Year</label>
-                  <select value={newStudent.yearLevel} onChange={(e) => setNewStudent({...newStudent, yearLevel: e.target.value})} className="w-full bg-slate-800 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white appearance-none cursor-pointer">
+                  <select value={newStudent.yearLevel} onChange={(e) => setNewStudent({...newStudent, yearLevel: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-sm outline-none text-white focus:border-indigo-500 appearance-none cursor-pointer transition-all">
                     <option value="" disabled>SELECT LEVEL</option>
                     {yearLevels.map(lvl => <option key={lvl} value={lvl} className="bg-slate-900">{lvl.toUpperCase()}</option>)}
                   </select>
                 </div>
                 <div className="space-y-2">
                   <label className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] ml-1">Block</label>
-                  <select value={newStudent.block} onChange={(e) => setNewStudent({...newStudent, block: e.target.value})} className="w-full bg-slate-800 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white appearance-none cursor-pointer">
+                  <select value={newStudent.block} onChange={(e) => setNewStudent({...newStudent, block: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-sm outline-none text-white focus:border-indigo-500 appearance-none cursor-pointer transition-all">
                     <option value="" disabled>SELECT BLOCK</option>
                     {blocks.map(blk => <option key={blk} value={blk} className="bg-slate-900">{blk.toUpperCase()}</option>)}
                   </select>
                 </div>
                 <div className="space-y-2">
                   <label className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] ml-1">Email Address</label>
-                  <input type="email" placeholder="Email Address" value={newStudent.email} onChange={(e) => setNewStudent({...newStudent, email: e.target.value})} className="w-full bg-slate-800 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white"/>
+                  <input type="email" placeholder="Email Address" value={newStudent.email} onChange={(e) => setNewStudent({...newStudent, email: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-sm outline-none text-white focus:border-indigo-500 transition-all"/>
                 </div>
               </div>
 
@@ -371,7 +371,7 @@ export default function StudentListPage() {
                 <div className="space-y-2">
                   <label className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] ml-1">Security Password</label>
                   <div className="flex gap-2">
-                    <input type="text" placeholder="Password" value={newStudent.password} onChange={(e) => setNewStudent({...newStudent, password: e.target.value})} className="flex-1 bg-slate-800 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-500 outline-none text-white"/>
+                    <input type="text" placeholder="Password" value={newStudent.password} onChange={(e) => setNewStudent({...newStudent, password: e.target.value})} className="flex-1 bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-sm outline-none text-white focus:border-indigo-500 transition-all"/>
                     <button type="button" onClick={() => {
                       const charset = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
                       let pwd = "";
@@ -408,7 +408,7 @@ export default function StudentListPage() {
         <div className="relative group">
           <input 
             type="text" placeholder="Search by name or email..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-slate-900/50 border border-white/5 p-5 rounded-2xl outline-none text-white text-xs font-bold uppercase tracking-widest focus:border-indigo-500/50 transition-all shadow-inner"
+            className="w-full bg-slate-900/50 border border-slate-700 p-5 rounded-2xl outline-none text-white text-sm focus:border-indigo-500/50 transition-all shadow-inner"
           />
         </div>
 
@@ -417,7 +417,7 @@ export default function StudentListPage() {
             <select 
               value={activeYearFilter}
               onChange={(e) => setActiveYearFilter(e.target.value)}
-              className="w-full bg-slate-900/80 text-white border border-white/10 rounded-2xl px-6 py-4 text-[10px] font-black uppercase tracking-widest appearance-none outline-none focus:border-indigo-500"
+              className="w-full bg-slate-900/80 text-white border border-slate-700 rounded-2xl px-6 py-4 text-sm outline-none focus:border-indigo-500 appearance-none"
             >
               {['All', ...yearLevels].map((lvl) => (
                 <option key={lvl} value={lvl} className="bg-slate-900 text-white uppercase">{lvl.toUpperCase()}</option>
@@ -515,7 +515,7 @@ export default function StudentListPage() {
               placeholder="Reason for deletion" 
               value={deleteReason} 
               onChange={(e) => setDeleteReason(e.target.value)} 
-              className="w-full bg-slate-800 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold uppercase tracking-widest focus:border-rose-500 outline-none text-white mb-6"
+              className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-sm outline-none text-white focus:border-rose-500 transition-all mb-6"
             />
             <div className="grid grid-cols-2 gap-4">
               <button onClick={() => {setConfirmModal({ show: false, id: null, name: '' }); setDeleteReason('')}} className="py-4 bg-slate-800 text-slate-300 rounded-2xl font-black text-[10px] uppercase">Back</button>
