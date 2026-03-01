@@ -144,8 +144,8 @@ export default function StudentPage() {
                 Are you sure you want to sign out of the student portal?
               </p>
               <div className="flex flex-col gap-3">
-                <button onClick={handleLogout} className="cursor-pointer w-full py-4 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95">Yes, Sign Out</button>
-                <button onClick={() => setShowLogoutModal(false)} className="cursor-pointer w-full py-4 bg-slate-800 text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95">Cancel</button>
+                <button onClick={handleLogout} className="hover:pointer cursor-pointer w-full py-4 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95">Yes, Sign Out</button>
+                <button onClick={() => setShowLogoutModal(false)} className="hover:pointer cursor-pointer w-full py-4 bg-slate-800 text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95">Cancel</button>
               </div>
             </div>
           </div>
@@ -173,7 +173,7 @@ export default function StudentPage() {
             <div className={`w-2 h-2 rounded-full ${isFormOpen ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
             <span className="text-[9px] font-black text-white uppercase tracking-widest">{isFormOpen ? `Opened - ${semester}` : "Closed"}</span>
           </div>
-          <button onClick={() => setShowLogoutModal(true)} className="cursor-pointer flex items-center gap-3 px-6 py-3 bg-slate-900 border border-white/10 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-rose-400 transition-all active:scale-95 flex-1 md:flex-none justify-center">
+          <button onClick={() => setShowLogoutModal(true)} className="hover:pointer cursor-pointer flex items-center gap-3 px-6 py-3 bg-slate-900 border border-white/10 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-rose-400 transition-all active:scale-95 flex-1 md:flex-none justify-center">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
             <span>Sign Out</span>
           </button>
@@ -228,7 +228,7 @@ export default function StudentPage() {
             <button
               disabled={!yearLevel || !isFormOpen}
               onClick={() => router.push(`/Evaluation?year=${encodeURIComponent(yearLevel)}`)}
-              className="cursor-pointer group flex items-center justify-center w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-black py-5 px-12 rounded-2xl transition-all shadow-lg shadow-indigo-600/20 uppercase text-[11px] tracking-[0.2em]"
+              className="hover:pointer cursor-pointer group flex items-center justify-center w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-black py-5 px-12 rounded-2xl transition-all shadow-lg shadow-indigo-600/20 uppercase text-[11px] tracking-[0.2em]"
             >
               {!yearLevel ? "Loading Year Level..." : "Launch Evaluation"}
               <svg className="w-5 h-5 ml-3 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
