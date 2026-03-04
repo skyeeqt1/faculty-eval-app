@@ -106,3 +106,14 @@ select:hover,
 [role="button"]:hover {
   cursor: pointer;
 }
+
+/* Prevent horizontal scroll in mobile view */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Ensure all elements respect viewport width */
+* {
+  box-sizing: border-box;
+}

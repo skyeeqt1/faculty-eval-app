@@ -428,8 +428,8 @@ export default function FacultyManagement() {
 
       {/* LIST TABLE */}
       <section className="flex-1 min-h-0 bg-slate-900/50 border border-white/5 rounded-[2.5rem] overflow-hidden backdrop-blur-sm flex flex-col shadow-2xl mb-24 md:mb-0">
-        <div className="overflow-y-auto custom-scrollbar flex-1">
-          <table className="w-full text-left min-w-full border-collapse">
+        <div className="overflow-y-auto custom-scrollbar flex-1 overflow-x-hidden">
+          <table className="w-full text-left min-w-0 border-collapse">
             <thead className="sticky top-0 z-10 bg-[#151c2e]">
               <tr className="border-b border-white/5">
                 <th className="p-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Instructor</th>

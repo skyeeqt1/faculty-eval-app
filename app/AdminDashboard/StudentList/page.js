@@ -448,45 +448,45 @@ export default function StudentListPage() {
 
       {/* STUDENT TABLE */}
       <section className="flex-1 min-h-0 bg-slate-900/50 border border-white/5 rounded-[2.5rem] overflow-hidden backdrop-blur-sm flex flex-col shadow-2xl mb-24 md:mb-0">
-        <div className="overflow-y-auto custom-scrollbar flex-1">
-          <table className="w-full text-left min-w-full border-collapse">
+        <div className="overflow-y-auto custom-scrollbar flex-1 overflow-x-hidden">
+          <table className="w-full text-left min-w-0 border-collapse">
             <thead className="sticky top-0 z-10 bg-[#151c2e]">
               <tr className="border-b border-white/5">
-                <th className="p-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Student Identity</th>
-                <th className="hidden lg:table-cell p-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Year Level</th>
-                <th className="hidden md:table-cell p-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Email Address</th>
-                <th className="p-6 text-right text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Actions</th>
+                <th className="p-4 md:p-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] w-1/3">Student</th>
+                <th className="hidden lg:table-cell p-4 md:p-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Year Level</th>
+                <th className="hidden md:table-cell p-4 md:p-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Email</th>
+                <th className="p-4 md:p-6 text-right text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] w-20">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {filteredStudents.map((s) => (
                 <tr key={s.id} onClick={() => handleOpenDrawer(s)} className="group hover:bg-white/[0.03] transition-colors cursor-pointer lg:cursor-default">
-                  <td className="p-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/10 flex items-center justify-center text-indigo-400 font-black text-xs shrink-0">
+                  <td className="p-4 md:p-6">
+                    <div className="flex items-center gap-3 md:gap-4">
+                      <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/10 flex items-center justify-center text-indigo-400 font-black text-xs shrink-0">
                         {s.firstname?.[0]}{s.lastname?.[0]}
                       </div>
-                      <div className="flex flex-col">
+                      <div className="flex flex-col min-w-0">
                         <span className="font-black text-slate-200 uppercase italic text-sm group-hover:text-indigo-400 transition-colors truncate">{s.firstname} {s.lastname}</span>
                         <span className="lg:hidden text-[9px] text-indigo-500 font-black uppercase tracking-widest mt-0.5">{s.yearlevel || 'Unset'}</span>
                       </div>
                     </div>
                   </td>
-                  <td className="hidden lg:table-cell p-6">
+                  <td className="hidden lg:table-cell p-4 md:p-6">
                     <span className="px-3 py-1 bg-indigo-500/10 text-indigo-400 border border-indigo-500/10 rounded-lg text-[9px] font-black uppercase tracking-widest">
                       {s.yearlevel || 'N/A'}
                     </span>
                   </td>
-                  <td className="hidden md:table-cell p-6">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{s.email}</span>
+                  <td className="hidden md:table-cell p-4 md:p-6">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest truncate block max-w-[150px]">{s.email}</span>
                   </td>
-                  <td className="p-6 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button onClick={(e) => { e.stopPropagation(); setEditingStudent(s); setIsAddFormOpen(true); }} className="p-3 text-indigo-500 hover:bg-indigo-500/10 rounded-xl transition-all cursor-pointer">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                  <td className="p-4 md:p-6 text-right w-20">
+                    <div className="flex items-center justify-end gap-1 md:gap-2">
+                      <button onClick={(e) => { e.stopPropagation(); setEditingStudent(s); setIsAddFormOpen(true); }} className="p-2 md:p-3 text-indigo-500 hover:bg-indigo-500/10 rounded-xl transition-all cursor-pointer">
+                        <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); setConfirmModal({ show: true, id: s.id, name: `${s.firstname} ${s.lastname}` }) }} className="p-3 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all cursor-pointer">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      <button onClick={(e) => { e.stopPropagation(); setConfirmModal({ show: true, id: s.id, name: `${s.firstname} ${s.lastname}` }) }} className="p-2 md:p-3 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all cursor-pointer">
+                        <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
                     </div>
                   </td>
