@@ -2,6 +2,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
+import bcrypt from 'bcryptjs'
 
 function ChangePasswordContent() {
   const router = useRouter()
@@ -31,10 +32,14 @@ function ChangePasswordContent() {
 
     setLoading(true)
     try {
+      // Hash the new password
+      const hashedPassword = await bcrypt.hash(newPassword, 10)
+      
+      // Update password directly in database
       const { error } = await supabase
         .from("authorized_students")
         .update({
-          password: newPassword,
+          password: hashedPassword,
           mustchangepassword: false
         })
         .eq("id", studentId)

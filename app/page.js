@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react' 
 import { supabase } from '../lib/supabase' 
 import { useRouter } from 'next/navigation'
+import bcrypt from 'bcryptjs'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -67,7 +68,7 @@ export default function LoginPage() {
         }
       }
 
-      // Student login - query from database
+      // Student login - Check database for account with hashed password
       const { data: students, error } = await supabase
         .from("authorized_students")
         .select("*")
@@ -80,7 +81,10 @@ export default function LoginPage() {
         return
       }
 
-      if (students.password === password) {
+      // Verify password using bcrypt
+      const isValidPassword = await bcrypt.compare(password, students.password)
+      
+      if (isValidPassword) {
         if (students.mustchangepassword) {
           router.push(`/ChangePassword?id=${students.id}`)
           setLoading(false)

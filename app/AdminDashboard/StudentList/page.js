@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
+import bcrypt from 'bcryptjs'
 
 export default function StudentListPage() {
   const [loading, setLoading] = useState(true)
@@ -136,9 +137,9 @@ export default function StudentListPage() {
           yearlevel: newStudent.yearLevel,
           block: newStudent.block
         }
-        // Only update password if a new one is provided
+        // Only update password if a new one is provided (hash it)
         if (newStudent.password) {
-          updateData.password = newStudent.password
+          updateData.password = await bcrypt.hash(newStudent.password, 10)
         }
         
         const { error } = await supabase
@@ -155,9 +156,13 @@ export default function StudentListPage() {
         // Refresh the students list
         fetchStudents()
       } else {
-        // Add new student with random UUID
+        // Add new student with hashed password
         const studentId = crypto.randomUUID()
         
+        // Hash the password
+        const hashedPassword = await bcrypt.hash(newStudent.password, 10)
+        
+        // Store student data with hashed password
         const { error } = await supabase
           .from("authorized_students")
           .insert({
@@ -165,7 +170,7 @@ export default function StudentListPage() {
             firstname: newStudent.firstName.trim(),
             lastname: newStudent.lastName.trim(),
             email: newStudent.email.trim().toLowerCase(),
-            password: newStudent.password,
+            password: hashedPassword,
             yearlevel: newStudent.yearLevel,
             block: newStudent.block,
             mustchangepassword: true,
@@ -225,26 +230,34 @@ export default function StudentListPage() {
     const student = resetConfirmModal.student
     if (!student) return
     try {
+      // Generate a temp password
       const charset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
       let tempPassword = ""
       for (let i = 0; i < 8; i++) tempPassword += charset.charAt(Math.floor(Math.random() * charset.length))
       
+      // Hash the temp password
+      const hashedPassword = await bcrypt.hash(tempPassword, 10)
+      
+      // Update password directly in database
       const { error } = await supabase
         .from("authorized_students")
         .update({ 
-          password: tempPassword, 
+          password: hashedPassword,
           mustchangepassword: true
         })
         .eq("id", student.id)
 
       if (error) throw error
       
-      await logActivity("PASSWORD_RESET", `Generated temp password for ${student.firstname} ${student.lastname}`)
+      await logActivity("PASSWORD_RESET", `Reset password for ${student.firstname} ${student.lastname}`)
       setGeneratedPassword(tempPassword)
       setResetConfirmModal({ show: false, student: null })
       setIsAddFormOpen(false)
       setEditingStudent(null)
-    } catch (err) { showToast("Reset failed") }
+    } catch (err) { 
+      console.error("Reset error:", err)
+      showToast("Reset failed") 
+    }
   }
 
   const handleDelete = async () => {
