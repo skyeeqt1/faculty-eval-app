@@ -35,7 +35,7 @@ export default function StudentListPage() {
   const [copied, setCopied] = useState(false)
 
   const yearLevels = ["1st Year", "2nd Year", "3rd Year", "4th Year"]
-  const blocks = ["Blk A", "Blk B", "Blk C", "Blk D", "Blk E"]
+  const blocks = ["Blk A", "Blk B", "Blk C", "Blk D", "Blk E", "Blk F", "Blk G"]
 
   useEffect(() => {
     const channel = supabase
@@ -147,7 +147,15 @@ export default function StudentListPage() {
           .update(updateData)
           .eq("id", editingStudent.id)
 
-        if (error) throw error
+        if (error) {
+          console.error("Update student error:", error)
+          if (error.code === '23505' || error.message.includes('duplicate')) {
+            showToast("Email already exists")
+            return
+          }
+          showToast(error.message || "Failed to update student")
+          return
+        }
         
         await logActivity("UPDATE_STUDENT", `Updated: ${studentName} (${newStudent.yearLevel} - ${newStudent.block})`)
         setEditingStudent(null)
@@ -178,7 +186,15 @@ export default function StudentListPage() {
             createdat: new Date().toISOString()
           })
 
-        if (error) throw error
+        if (error) {
+          console.error("Insert student error:", error)
+          if (error.code === '23505' || error.message.includes('duplicate')) {
+            showToast("Email already exists")
+            return
+          }
+          showToast(error.message || "Failed to register student")
+          return
+        }
         
         await logActivity("REGISTER_STUDENT", `Registered: ${studentName} (${newStudent.yearLevel} - ${newStudent.block})`)
         showToast("Student Registered")

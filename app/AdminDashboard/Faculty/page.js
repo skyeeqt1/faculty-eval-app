@@ -10,11 +10,13 @@ export default function FacultyManagement() {
   
   // States for editing
   const [editingProf, setEditingProf] = useState(null)
+  const [isLoadingProf, setIsLoadingProf] = useState(false)
   
-  // States for Subjects
+  // States for Subjects - now with blocks per subject
   const [availableSubjects, setAvailableSubjects] = useState([])
-  const [selectedSubjects, setSelectedSubjects] = useState([])
+  const [selectedSubjects, setSelectedSubjects] = useState([]) // Array of { name: string, blocks: string[] }
   const [isSubjectDropdownOpen, setIsSubjectDropdownOpen] = useState(false)
+  const [expandedSubjectBlocks, setExpandedSubjectBlocks] = useState({}) // Track which subject's blocks are expanded
 
   const [toast, setToast] = useState({ show: false, message: '' })
   const [confirmModal, setConfirmModal] = useState({ show: false, id: null, name: '' })
@@ -27,6 +29,7 @@ export default function FacultyManagement() {
   const [selectedYears, setSelectedYears] = useState([]) 
 
   const yearOptions = ["1st Year", "2nd Year", "3rd Year", "4th Year"]
+  const blockOptions = ["Blk A", "Blk B", "Blk C", "Blk D", "Blk E", "Blk F", "Blk G"]
 
   // Populate form when editing a professor
   useEffect(() => {
@@ -34,7 +37,40 @@ export default function FacultyManagement() {
       setName(editingProf.name || '')
       setImageUrl(editingProf.imageurl || '')
       setSelectedYears(Array.isArray(editingProf.assignedyears) ? editingProf.assignedyears : [])
-      setSelectedSubjects(Array.isArray(editingProf.subjects) ? editingProf.subjects : [])
+      
+      // Parse subjects with their blocks
+      const parsedSubjects = []
+      const profSubjects = Array.isArray(editingProf.subjects) ? editingProf.subjects : []
+      const profBlocks = Array.isArray(editingProf.block) ? editingProf.block : []
+      
+      // Check if subjectblocks exists (new format)
+      let subjectBlockMap = {}
+      if (typeof editingProf.subjectblocks === 'object' && editingProf.subjectblocks !== null) {
+        subjectBlockMap = editingProf.subjectblocks
+      } else if (typeof editingProf.subjectblocks === 'string' && editingProf.subjectblocks) {
+        try {
+          subjectBlockMap = JSON.parse(editingProf.subjectblocks)
+        } catch {}
+      }
+      
+      profSubjects.forEach(subName => {
+        // Check if subjectblocks has specific blocks for this subject
+        let subjectBlocks = []
+        if (subjectBlockMap[subName] && Array.isArray(subjectBlockMap[subName])) {
+          subjectBlocks = subjectBlockMap[subName]
+        } else if (profBlocks.length > 0) {
+          // Fallback to legacy combined block field
+          subjectBlocks = profBlocks
+        } else {
+          subjectBlocks = blockOptions
+        }
+        parsedSubjects.push({
+          name: subName,
+          blocks: subjectBlocks
+        })
+      })
+      
+      setSelectedSubjects(parsedSubjects)
       setSelectedFile(null)
     } else {
       // Reset form when closing
@@ -82,9 +118,34 @@ export default function FacultyManagement() {
     const fetchRelevantSubjects = async () => {
       if (selectedYears.length === 0) {
         setAvailableSubjects([])
-        setSelectedSubjects([])
+        if (!editingProf && !isLoadingProf) {
+          setSelectedSubjects([])
+        }
         return
       }
+      
+      // If loading a professor, don't reset selectedSubjects
+      if (isLoadingProf) {
+        try {
+          const { data, error } = await supabase
+            .from("subjects")
+            .select("*")
+            .in("yearlevel", selectedYears)
+
+          if (!error && data) {
+            const subs = (data || []).map(doc => ({
+              id: doc.id, 
+              title: doc.name, 
+              year: doc.yearlevel 
+            }))
+            setAvailableSubjects(subs)
+          }
+        } catch (err) {
+          console.error("Error fetching subjects:", err)
+        }
+        return
+      }
+      
       try {
         const { data, error } = await supabase
           .from("subjects")
@@ -99,12 +160,17 @@ export default function FacultyManagement() {
           year: doc.yearlevel 
         }))
         setAvailableSubjects(subs)
+        
+        // Only clear selectedSubjects when adding new (not editing)
+        if (!editingProf) {
+          setSelectedSubjects([])
+        }
       } catch (err) {
         console.error("Error fetching subjects:", err)
       }
     }
     fetchRelevantSubjects()
-  }, [selectedYears])
+  }, [selectedYears, editingProf, isLoadingProf])
 
   const logActivity = async (action, details) => {
     try {
@@ -183,9 +249,38 @@ export default function FacultyManagement() {
   }
 
   const handleSubjectToggle = (subjectName) => {
+    setSelectedSubjects(prev => {
+      const exists = prev.find(s => s.name === subjectName)
+      if (exists) {
+        // Remove subject if already selected
+        return prev.filter(s => s.name !== subjectName)
+      } else {
+        // Add subject with default all blocks selected
+        return [...prev, { name: subjectName, blocks: [...blockOptions] }]
+      }
+    })
+  }
+
+  const handleSubjectBlockToggle = (subjectName, block) => {
     setSelectedSubjects(prev => 
-      prev.includes(subjectName) ? prev.filter(s => s !== subjectName) : [...prev, subjectName]
+      prev.map(s => {
+        if (s.name !== subjectName) return s
+        const hasBlock = s.blocks.includes(block)
+        return {
+          ...s,
+          blocks: hasBlock 
+            ? s.blocks.filter(b => b !== block)
+            : [...s.blocks, block]
+        }
+      })
     )
+  }
+
+  const toggleSubjectBlockExpand = (subjectName) => {
+    setExpandedSubjectBlocks(prev => ({
+      ...prev,
+      [subjectName]: !prev[subjectName]
+    }))
   }
 
   const handleAddFaculty = async (e) => {
@@ -205,28 +300,48 @@ export default function FacultyManagement() {
       }
 
       if (editingProf) {
-        // Update existing professor
+        // Update existing professor - store subjects with their blocks
+        const subjectsWithBlocks = selectedSubjects.map(s => s.name)
+        const subjectBlockMap = {}
+        selectedSubjects.forEach(s => {
+          subjectBlockMap[s.name] = s.blocks
+        })
+        const allBlocks = selectedSubjects.flatMap(s => s.blocks)
+        
         const { error } = await supabase
           .from("professors")
           .update({
             name: name.trim(),
             imageurl: finalImageUrl || null,
             assignedyears: selectedYears,
-            subjects: selectedSubjects
+            subjects: subjectsWithBlocks,
+            block: [...new Set(allBlocks)],
+            subjectblocks: subjectBlockMap
           })
           .eq("id", editingProf.id)
 
-        if (error) throw error
+        if (error) {
+          console.error("Update error:", error)
+          showToast(error.message || "Update failed")
+          return
+        }
         
         await logActivity("UPDATE_INSTRUCTOR", `Updated: ${name.trim()}`)
         setEditingProf(null)
+        setIsLoadingProf(false)
         showToast("Instructor Updated")
         
         // Refresh the professors list
         fetchProfessors()
       } else {
-        // Add new professor with random UUID
+        // Add new professor with random UUID - store subjects with their blocks
         const profId = crypto.randomUUID()
+        const subjectsWithBlocks = selectedSubjects.map(s => s.name)
+        const subjectBlockMap = {}
+        selectedSubjects.forEach(s => {
+          subjectBlockMap[s.name] = s.blocks
+        })
+        const allBlocks = selectedSubjects.flatMap(s => s.blocks)
         
         const { error } = await supabase
           .from("professors")
@@ -235,11 +350,17 @@ export default function FacultyManagement() {
             name: name.trim(),
             imageurl: finalImageUrl || null,
             assignedyears: selectedYears,
-            subjects: selectedSubjects,
+            subjects: subjectsWithBlocks,
+            block: [...new Set(allBlocks)],
+            subjectblocks: subjectBlockMap,
             createdat: new Date().toISOString()
           })
 
-        if (error) throw error
+        if (error) {
+          console.error("Insert error:", error)
+          showToast(error.message || "Insert failed")
+          return
+        }
         
         await logActivity("REGISTER_INSTRUCTOR", `Registered: ${name.trim()}`)
         showToast("Instructor Registered")
@@ -249,6 +370,7 @@ export default function FacultyManagement() {
       }
       setName(''); setImageUrl(''); setSelectedYears([]); setSelectedSubjects([]); setSelectedFile(null);
       setIsAddFormOpen(false)
+      setIsLoadingProf(false)
     } catch (err) { 
       console.error("Error:", err)
       setUploading(false)
@@ -329,7 +451,7 @@ export default function FacultyManagement() {
                 <h3 className="text-xl font-black text-white uppercase italic tracking-tight">{editingProf ? 'Edit Instructor' : 'Register Instructor'}</h3>
                 <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-1">{editingProf ? 'Update instructor details' : 'Add new faculty member'}</p>
               </div>
-              <button onClick={() => { setIsAddFormOpen(false); setEditingProf(null); }} className="text-slate-500 hover:text-white cursor-pointer"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg></button>
+              <button onClick={() => { setIsAddFormOpen(false); setEditingProf(null); setIsLoadingProf(false); }} className="text-slate-500 hover:text-white cursor-pointer"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg></button>
             </div>
 
             <form onSubmit={handleAddFaculty} className="space-y-6">
@@ -398,16 +520,16 @@ export default function FacultyManagement() {
                 ) : (
                   <div className="relative">
                     <button type="button" onClick={() => setIsSubjectDropdownOpen(!isSubjectDropdownOpen)} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-sm text-left text-white flex justify-between items-center hover:border-indigo-500 transition-all cursor-pointer">
-                      <span className="truncate">{Array.isArray(selectedSubjects) && selectedSubjects.length > 0 ? selectedSubjects.join(", ") : "-- Select Subjects --"}</span>
+                      <span className="truncate">{selectedSubjects.length > 0 ? selectedSubjects.map(s => s.name).join(", ") : "-- Select Subjects --"}</span>
                       <svg className={`w-4 h-4 transition-transform ${isSubjectDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     {isSubjectDropdownOpen && (
                       <div className="absolute z-[1100] top-full left-0 w-full mt-2 bg-slate-800 border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2">
                         <div className="max-h-60 overflow-y-auto custom-scrollbar p-2 space-y-1">
                           {availableSubjects.map(sub => (
-                            <button key={sub.id} type="button" onClick={() => handleSubjectToggle(sub.title)} className={`w-full p-3 rounded-xl text-left flex justify-between items-center transition-all cursor-pointer ${Array.isArray(selectedSubjects) && selectedSubjects.includes(sub.title) ? 'bg-indigo-600 text-white' : 'hover:bg-white/5 text-slate-400'}`}>
+                            <button key={sub.id} type="button" onClick={() => handleSubjectToggle(sub.title)} className={`w-full p-3 rounded-xl text-left flex justify-between items-center transition-all cursor-pointer ${selectedSubjects.some(s => s.name === sub.title) ? 'bg-indigo-600 text-white' : 'hover:bg-white/5 text-slate-400'}`}>
                               <span className="text-[10px] font-black uppercase tracking-tight">{sub.title}</span>
-                              <span className={`text-[8px] font-bold uppercase ${Array.isArray(selectedSubjects) && selectedSubjects.includes(sub.title) ? 'text-indigo-200' : 'text-slate-600'}`}>{sub.year}</span>
+                              <span className={`text-[8px] font-bold uppercase ${selectedSubjects.some(s => s.name === sub.title) ? 'text-indigo-200' : 'text-slate-600'}`}>{sub.year}</span>
                             </button>
                           ))}
                         </div>
@@ -417,8 +539,46 @@ export default function FacultyManagement() {
                 )}
               </div>
 
+              {/* PER-SUBJECT BLOCK SELECTION */}
+              {selectedSubjects.length > 0 && (
+                <div className="space-y-4">
+                  <label className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] ml-1">3. Assign Blocks per Subject</label>
+                  {selectedSubjects.map((subject, idx) => (
+                    <div key={idx} className="bg-slate-800/50 rounded-2xl p-4 border border-white/5">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-black text-white uppercase">{subject.name}</span>
+                        <button 
+                          type="button"
+                          onClick={() => toggleSubjectBlockExpand(subject.name)}
+                          className="text-[10px] text-indigo-400 hover:text-indigo-300 uppercase tracking-widest"
+                        >
+                          {expandedSubjectBlocks[subject.name] ? 'Hide Blocks' : 'Select Blocks'}
+                        </button>
+                      </div>
+                      {expandedSubjectBlocks[subject.name] && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {blockOptions.map(blk => (
+                            <button 
+                              key={blk} 
+                              type="button" 
+                              onClick={() => handleSubjectBlockToggle(subject.name, blk)}
+                              className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer ${subject.blocks.includes(blk) ? 'bg-indigo-600 border-indigo-400 text-white' : 'bg-slate-900 border-white/5 text-slate-500 hover:text-slate-300'}`}
+                            >
+                              {blk}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <div className="mt-2 text-[9px] text-slate-500">
+                        Selected: {subject.blocks.length === blockOptions.length ? 'All Blocks' : subject.blocks.join(", ")}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="flex gap-3 pt-12">
-                <button type="button" onClick={() => { setIsAddFormOpen(false); setEditingProf(null); }} className="flex-1 py-4 bg-slate-800 text-slate-400 font-black text-[10px] uppercase rounded-2xl cursor-pointer">Discard</button>
+                <button type="button" onClick={() => { setIsAddFormOpen(false); setEditingProf(null); setIsLoadingProf(false); }} className="flex-1 py-4 bg-slate-800 text-slate-400 font-black text-[10px] uppercase rounded-2xl cursor-pointer">Discard</button>
                 <button type="submit" disabled={uploading} className="flex-[2] py-4 bg-indigo-600 text-white font-black text-[10px] uppercase rounded-2xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">{uploading ? 'Uploading...' : (editingProf ? 'Update Faculty' : 'Confirm Faculty')}</button>
               </div>
             </form>
@@ -466,7 +626,7 @@ export default function FacultyManagement() {
                   </td>
                   <td className="p-6 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button onClick={() => { setEditingProf(prof); setIsAddFormOpen(true); }} className="p-3 text-indigo-500 hover:bg-indigo-500/10 rounded-xl transition-all cursor-pointer">
+                      <button onClick={() => { setIsLoadingProf(true); setEditingProf(prof); setIsAddFormOpen(true); }} className="p-3 text-indigo-500 hover:bg-indigo-500/10 rounded-xl transition-all cursor-pointer">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                       </button>
                       <button onClick={() => setConfirmModal({ show: true, id: prof.id, name: prof.name })} className="p-3 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all cursor-pointer">

@@ -227,7 +227,7 @@ export default function StudentPage() {
             </p>
             <button
               disabled={!yearLevel || !isFormOpen}
-              onClick={() => router.push(`/Evaluation?year=${encodeURIComponent(yearLevel)}`)}
+              onClick={() => router.push(`/Evaluation?year=${encodeURIComponent(yearLevel)}${block ? `&block=${encodeURIComponent(block)}` : ''}`)}
               className="hover:pointer cursor-pointer group flex items-center justify-center w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-black py-5 px-12 rounded-2xl transition-all shadow-lg shadow-indigo-600/20 uppercase text-[11px] tracking-[0.2em]"
             >
               {!yearLevel ? "Loading Year Level..." : "Launch Evaluation"}

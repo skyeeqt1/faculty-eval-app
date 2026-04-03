@@ -19,6 +19,7 @@ function EvaluationContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const selectedYear = searchParams.get('year')
+  const studentBlock = searchParams.get('block')
 
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(true)
@@ -38,6 +39,7 @@ function EvaluationContent() {
   })
 
   const [isConfirmingSubmit, setIsConfirmingSubmit] = useState(false)
+  const [showBackConfirm, setShowBackConfirm] = useState(false)
 
   const showModal = (type, title, message, callback = null, showCancel = false) => {
     setModalConfig({ isOpen: true, type, title, message, callback, showCancel })
@@ -46,6 +48,24 @@ function EvaluationContent() {
   const closeModal = () => {
     setModalConfig({ ...modalConfig, isOpen: false })
   }
+
+  useEffect(() => {
+    const handlePopState = (event) => {
+      const hasChanges = evaluations.some(e => e.rating !== 5 || e.comment.trim() !== '')
+      if (hasChanges) {
+        event.preventDefault()
+        setShowBackConfirm(true)
+        window.history.pushState(null, '', window.location.href)
+      }
+    }
+
+    window.history.pushState(null, '', window.location.href)
+    window.addEventListener('popstate', handlePopState)
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [evaluations])
 
   useEffect(() => {
     const checkAccess = async () => {
@@ -144,21 +164,73 @@ function EvaluationContent() {
         
         const hasYear = assignedYearsArray.includes(cleanYear)
         
-        const filteredSubjects = (semesterSubjects.length > 0 && hasYear) 
-          ? subjectList.filter(sub => semesterSubjects.includes(sub)) 
-          : (hasYear ? subjectList : [])
+        // Check block assignment per subject
+        let subjectBlockMap = {}
+        if (typeof data.subjectblocks === 'object' && data.subjectblocks !== null) {
+          subjectBlockMap = data.subjectblocks
+        } else if (typeof data.subjectblocks === 'string' && data.subjectblocks) {
+          try {
+            subjectBlockMap = JSON.parse(data.subjectblocks)
+          } catch {}
+        }
+        
+        // Fallback to main block field if subjectblocks doesn't exist (legacy data)
+        let assignedBlocksArray = []
+        if (Object.keys(subjectBlockMap).length === 0) {
+          if (Array.isArray(data.block)) {
+            assignedBlocksArray = data.block
+          } else if (typeof data.block === 'string' && data.block) {
+            try {
+              assignedBlocksArray = JSON.parse(data.block)
+            } catch {
+              assignedBlocksArray = [data.block]
+            }
+          }
+        }
+        
+        // Check if any subject is assigned to the student's block
+        let hasBlock = false
+        if (!studentBlock || Object.keys(subjectBlockMap).length === 0) {
+          // No block filter or legacy data - use old logic
+          hasBlock = !studentBlock || assignedBlocksArray.length === 0 || assignedBlocksArray.includes(studentBlock)
+        } else {
+          // Check each subject's block assignments
+          for (const sub of subjectList) {
+            const subBlocks = subjectBlockMap[sub] || []
+            if (subBlocks.includes(studentBlock)) {
+              hasBlock = true
+              break
+            }
+          }
+        }
+        
+        // Filter subjects based on student's block
+        let filteredSubjects = []
+        if (hasYear) {
+          if (Object.keys(subjectBlockMap).length > 0 && studentBlock) {
+            // New logic: filter to only subjects assigned to student's block
+            filteredSubjects = subjectList.filter(sub => {
+              const subBlocks = subjectBlockMap[sub] || []
+              return subBlocks.includes(studentBlock)
+            })
+          } else if (semesterSubjects.length > 0) {
+            filteredSubjects = subjectList.filter(sub => semesterSubjects.includes(sub))
+          } else {
+            filteredSubjects = subjectList
+          }
+        }
         
         return {
           name: data.name,
           image: data.imageurl || "",
           subjects: filteredSubjects,
-          hasYear
+          hasYear: hasYear
         }
       }).filter(p => p.subjects.length > 0)
 
       setEvaluations(profList.map(p => ({
         ...p,
-        selectedSubject: '',
+        selectedSubject: p.subjects[0] || '', // Auto-select first subject
         rating: 5,
         comment: ''
       })))
@@ -169,6 +241,8 @@ function EvaluationContent() {
       setFetching(false)
     }
   }
+
+  const hasChanges = evaluations.some(e => e.rating !== 5 || e.comment.trim() !== '')
 
   const updateEval = (index, field, value) => {
     const newEvals = [...evaluations]
@@ -272,6 +346,21 @@ function EvaluationContent() {
         </div>
       )}
 
+      {showBackConfirm && (
+        <div className="fixed inset-0 z-[105] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+            <div className="bg-slate-900 border border-white/5 w-full max-w-sm sm:max-w-md rounded-[2.5rem] p-8 sm:p-10 shadow-2xl text-center relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-amber-500 to-transparent"></div>
+                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-amber-500/10 text-amber-400 rounded-3xl flex items-center justify-center mx-auto mb-6 sm:mb-8 border border-amber-500/20 shadow-inner"><svg className="w-8 h-8 sm:w-10 sm:h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg></div>
+                <h3 className="text-xl sm:text-2xl font-black text-white uppercase italic tracking-tighter mb-3 sm:mb-4">Go Back?</h3>
+                <p className="text-slate-400 text-[10px] sm:text-[11px] font-bold uppercase tracking-widest leading-loose mb-8 sm:mb-10">Your current progress will be lost. Are you sure you want to go back?</p>
+                <div className="flex gap-3 sm:gap-4">
+                    <button onClick={() => setShowBackConfirm(false)} className="hover:pointer flex-1 bg-slate-800 hover:bg-slate-700 text-slate-400 py-3 sm:py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all cursor-pointer">Cancel</button>
+                    <button onClick={() => { setShowBackConfirm(false); router.push('/StudentDashboard'); }} className="hover:pointer flex-1 bg-rose-600 hover:bg-rose-500 text-white py-3 sm:py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg cursor-pointer">Go Back</button>
+                </div>
+            </div>
+        </div>
+      )}
+
       <div className="w-full max-w-4xl z-10">
         {(hasAlreadyEvaluated || !isFormOpen) ? (
             <div className="min-h-[70vh] flex items-center justify-center text-center p-4">
@@ -284,9 +373,9 @@ function EvaluationContent() {
             </div>
         ) : (
           <>
-            <button onClick={() => router.push('/StudentDashboard')} className="hover:pointer flex items-center gap-2 mb-6 sm:mb-8 text-slate-500 hover:text-indigo-400 font-black text-[10px] uppercase tracking-widest transition-colors cursor-pointer"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg><span className="hidden sm:inline">Return to Dashboard</span><span className="sm:hidden">Back</span></button>
+            <button onClick={() => hasChanges ? setShowBackConfirm(true) : router.push('/StudentDashboard')} className="hover:pointer flex items-center gap-2 mb-6 sm:mb-8 text-slate-500 hover:text-indigo-400 font-black text-[10px] uppercase tracking-widest transition-colors cursor-pointer"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg><span className="hidden sm:inline">Return to Dashboard</span><span className="sm:hidden">Back</span></button>
             <div className="bg-slate-900 rounded-[2.5rem] shadow-2xl p-6 sm:p-8 lg:p-10 mb-8 sm:mb-12 text-center border border-white/5 relative overflow-hidden">
-              <h2 className="text-2xl sm:text-3xl font-black uppercase italic tracking-tighter text-white"><span className="text-indigo-500">{selectedYear}</span> Faculty Evaluation</h2>
+              <h2 className="text-2xl sm:text-3xl font-black uppercase italic tracking-tighter text-white"><span className="text-indigo-500">{selectedYear}</span> {studentBlock && <span className="text-indigo-400">- {studentBlock}</span>} Faculty Evaluation</h2>
               <p className="text-slate-500 mt-3 font-bold uppercase tracking-[0.2em] text-[10px]">Encryption Active • Responses Anonymous</p>
             </div>
             <div className="space-y-8 sm:space-y-10">
@@ -304,10 +393,9 @@ function EvaluationContent() {
                         <div className="flex-1 w-full space-y-5 sm:space-y-6">
                           <div>
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2 sm:mb-3 ml-1">Assigned Subject</label>
-                            <select required value={item.selectedSubject} onChange={(e) => updateEval(index, 'selectedSubject', e.target.value)} className="cursor-pointer w-full bg-slate-800 p-3 sm:p-4 rounded-xl border border-slate-700 outline-none focus:border-indigo-500 font-bold text-xs text-white transition-all appearance-none">
-                              <option value="">-- SELECT SUBJECT --</option>
-                              {item.subjects.map((sub, i) => (<option key={i} value={sub}>{sub}</option>))}
-                            </select>
+                            <div className="w-full bg-indigo-600/10 p-3 sm:p-4 rounded-xl border border-indigo-500/20 font-bold text-xs text-indigo-400 uppercase tracking-wider">
+                              {item.selectedSubject}
+                            </div>
                           </div>
                           <div>
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-2 sm:mb-3 ml-1">Efficiency Rating (1-10)</label>

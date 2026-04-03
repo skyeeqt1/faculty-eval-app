@@ -2,7 +2,6 @@
 import { useEffect, useState } from 'react' 
 import { supabase } from '../lib/supabase' 
 import { useRouter } from 'next/navigation'
-import bcrypt from 'bcryptjs'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -44,67 +43,46 @@ export default function LoginPage() {
     }
 
     setLoading(true)
-    const cleanEmail = email.toLowerCase().trim()
 
     try {
-      // Check if it's admin email - use Supabase Auth
-      if (cleanEmail === "admintest@gmail.com") {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: cleanEmail,
-          password: password
-        })
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      })
 
-        if (error) {
-          setPopup({ show: true, message: "Access Denied: Incorrect password.", isSuccess: false })
-          setLoading(false)
-          return
-        }
+      const result = await response.json()
 
-        if (data.user) {
-          sessionStorage.setItem("adminSession", JSON.stringify({ email: data.user.email }))
-          setPopup({ show: true, message: "Admin identity confirmed...", isSuccess: true })
-          setTimeout(() => router.push('/AdminDashboard'), 2000)
-          return
-        }
-      }
-
-      // Student login - Check database for account with hashed password
-      const { data: students, error } = await supabase
-        .from("authorized_students")
-        .select("*")
-        .eq("email", cleanEmail)
-        .single()
-
-      if (error || !students) {
-        setPopup({ show: true, message: "Access Denied: Email not registered.", isSuccess: false })
+      if (!result.success) {
+        setPopup({ show: true, message: result.message, isSuccess: false })
         setLoading(false)
         return
       }
 
-      // Verify password using bcrypt
-      const isValidPassword = await bcrypt.compare(password, students.password)
-      
-      if (isValidPassword) {
-        if (students.mustchangepassword) {
-          router.push(`/ChangePassword?id=${students.id}`)
-          setLoading(false)
-          return
-        }
-
-        sessionStorage.setItem("studentSession", JSON.stringify({
-          email: students.email,
-          firstName: students.firstname,
-          lastName: students.lastname,
-          yearLevel: students.yearlevel,
-          block: students.block,
-          id: students.id
-        }))
-
-        setPopup({ show: true, message: "Identity verified. Redirecting...", isSuccess: true })
-        setTimeout(() => router.replace('/StudentDashboard'), 1500)
-      } else {
-        setPopup({ show: true, message: "Access Denied: Incorrect password.", isSuccess: false })
+      if (result.isAdmin) {
+        sessionStorage.setItem("adminSession", JSON.stringify({ email: result.user.email }))
+        setPopup({ show: true, message: "Admin identity confirmed...", isSuccess: true })
+        setTimeout(() => router.push('/AdminDashboard'), 2000)
+        return
       }
+
+      if (result.student.mustchangepassword) {
+        router.push(`/ChangePassword?id=${result.student.id}`)
+        setLoading(false)
+        return
+      }
+
+      sessionStorage.setItem("studentSession", JSON.stringify({
+        email: result.student.email,
+        firstName: result.student.firstName,
+        lastName: result.student.lastName,
+        yearLevel: result.student.yearLevel,
+        block: result.student.block,
+        id: result.student.id
+      }))
+
+      setPopup({ show: true, message: "Identity verified. Redirecting...", isSuccess: true })
+      setTimeout(() => router.replace('/StudentDashboard'), 1500)
     } catch (error) {
       setPopup({ show: true, message: "System Error: Unable to connect.", isSuccess: false })
     } finally {
