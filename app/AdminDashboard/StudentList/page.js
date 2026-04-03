@@ -52,6 +52,39 @@ export default function StudentListPage() {
     }
   }, [])
 
+  // Handle mobile back button to close form
+  useEffect(() => {
+    const handleBackButton = (e) => {
+      if (isAddFormOpen) {
+        e.preventDefault()
+        setIsAddFormOpen(false)
+        setEditingStudent(null)
+      } else if (isDrawerVisible) {
+        e.preventDefault()
+        handleCloseDrawer()
+      } else if (confirmModal.show) {
+        e.preventDefault()
+        setConfirmModal({ show: false, id: null, name: '' })
+      }
+    }
+
+    if (isAddFormOpen) {
+      // Push a state to history so back button will trigger popstate
+      window.history.pushState({ formOpen: true }, '')
+      window.addEventListener('popstate', handleBackButton)
+    } else if (isDrawerVisible) {
+      window.history.pushState({ drawerOpen: true }, '')
+      window.addEventListener('popstate', handleBackButton)
+    } else if (confirmModal.show) {
+      window.history.pushState({ confirmModalOpen: true }, '')
+      window.addEventListener('popstate', handleBackButton)
+    }
+
+    return () => {
+      window.removeEventListener('popstate', handleBackButton)
+    }
+  }, [isAddFormOpen, isDrawerVisible, confirmModal.show])
+
   const fetchStudents = async () => {
     try {
       const { data, error } = await supabase

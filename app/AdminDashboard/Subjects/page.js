@@ -40,6 +40,32 @@ export default function SubjectsManagement() {
     }
   }, [])
 
+  // Handle mobile back button to close form
+  useEffect(() => {
+    const handleBackButton = (e) => {
+      if (isAddFormOpen) {
+        e.preventDefault()
+        setIsAddFormOpen(false)
+      } else if (confirmModal.show) {
+        e.preventDefault()
+        setConfirmModal({ show: false, id: null, name: '' })
+      }
+    }
+
+    if (isAddFormOpen) {
+      // Push a state to history so back button will trigger popstate
+      window.history.pushState({ formOpen: true }, '')
+      window.addEventListener('popstate', handleBackButton)
+    } else if (confirmModal.show) {
+      window.history.pushState({ confirmModalOpen: true }, '')
+      window.addEventListener('popstate', handleBackButton)
+    }
+
+    return () => {
+      window.removeEventListener('popstate', handleBackButton)
+    }
+  }, [isAddFormOpen, confirmModal.show])
+
   const fetchSubjects = async () => {
     try {
       const { data, error } = await supabase

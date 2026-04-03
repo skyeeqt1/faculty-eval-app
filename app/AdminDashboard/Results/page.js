@@ -27,6 +27,31 @@ export default function RealTimeResults() {
     }
   }, [])
 
+  // Handle mobile back button to close modals
+  useEffect(() => {
+    const handleBackButton = (e) => {
+      if (selectedProf) {
+        e.preventDefault()
+        handleCloseModal()
+      } else if (showResetConfirm) {
+        e.preventDefault()
+        setShowResetConfirm(false)
+      }
+    }
+
+    if (selectedProf) {
+      window.history.pushState({ profModalOpen: true }, '')
+      window.addEventListener('popstate', handleBackButton)
+    } else if (showResetConfirm) {
+      window.history.pushState({ resetConfirmOpen: true }, '')
+      window.addEventListener('popstate', handleBackButton)
+    }
+
+    return () => {
+      window.removeEventListener('popstate', handleBackButton)
+    }
+  }, [selectedProf, showResetConfirm])
+
   const fetchEvaluations = async () => {
     try {
       const { data, error } = await supabase
