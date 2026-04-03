@@ -2,6 +2,14 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
 
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0
+    const v = c === 'x' ? r : (r & 0x3 | 0x8)
+    return v.toString(16)
+  })
+}
+
 export default function FacultyManagement() {
   const [loading, setLoading] = useState(true)
   const [isAddFormOpen, setIsAddFormOpen] = useState(false)
@@ -202,7 +210,7 @@ export default function FacultyManagement() {
   const logActivity = async (action, details) => {
     try {
       const adminEmail = sessionStorage.getItem("adminEmail") || "admintest@gmail.com"
-      const logId = crypto.randomUUID()
+      const logId = generateUUID()
       const { data, error } = await supabase.from("audit_logs").insert({
         id: logId,
         action: action,
@@ -213,8 +221,6 @@ export default function FacultyManagement() {
       
       if (error) {
         console.error("Audit log error:", error)
-      } else {
-        console.log("Activity logged:", action, details)
       }
     } catch (err) { console.error("Log failed:", err) }
   }
@@ -362,7 +368,7 @@ export default function FacultyManagement() {
         fetchProfessors()
       } else {
         // Add new professor with random UUID - store subjects with their blocks
-        const profId = crypto.randomUUID()
+        const profId = generateUUID()
         const subjectsWithBlocks = selectedSubjects.map(s => s.name)
         const subjectBlockMap = {}
         selectedSubjects.forEach(s => {
@@ -620,7 +626,6 @@ export default function FacultyManagement() {
             <thead className="sticky top-0 z-10 bg-[#151c2e]">
               <tr className="border-b border-white/5">
                 <th className="p-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Instructor</th>
-                <th className="hidden md:table-cell p-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Subjects</th>
                 <th className="p-6 text-right text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Action</th>
               </tr>
             </thead>
@@ -642,13 +647,6 @@ export default function FacultyManagement() {
                               : prof.assignedyears}
                         </span>
                       </div>
-                    </div>
-                  </td>
-                  <td className="hidden md:table-cell p-6">
-                    <div className="flex flex-wrap gap-1">
-                      {Array.isArray(prof.subjects) ? prof.subjects.map(sub => (
-                        <span key={sub} className="px-2 py-0.5 bg-slate-800 border border-white/5 text-slate-400 text-[8px] font-black uppercase rounded-md">{sub}</span>
-                      )) : <span className="text-slate-500 text-[8px]">-</span>}
                     </div>
                   </td>
                   <td className="p-6 text-right">

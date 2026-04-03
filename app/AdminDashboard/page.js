@@ -2,6 +2,14 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0
+    const v = c === 'x' ? r : (r & 0x3 | 0x8)
+    return v.toString(16)
+  })
+}
+
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [isFormOpen, setIsFormOpen] = useState(true)
@@ -86,7 +94,7 @@ export default function AdminDashboard() {
   const logActivity = async (action, details) => {
     try {
       const adminEmail = sessionStorage.getItem("adminEmail") || "admintest@gmail.com"
-      const logId = crypto.randomUUID()
+      const logId = generateUUID()
       const { data, error } = await supabase.from("audit_logs").insert({
         id: logId,
         action: action,

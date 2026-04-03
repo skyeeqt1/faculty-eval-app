@@ -3,6 +3,14 @@ import { useState, useEffect, Suspense } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0
+    const v = c === 'x' ? r : (r & 0x3 | 0x8)
+    return v.toString(16)
+  })
+}
+
 export default function EvaluationPage() {
   return (
     <Suspense fallback={
@@ -120,20 +128,20 @@ function EvaluationContent() {
         setCurrentSemester(semester)
       }
 
+      const cleanYear = decodeURIComponent(selectedYear).trim();
+
       let semesterSubjects = []
       try {
         const { data: subjectsData } = await supabase
           .from("subjects")
           .select("name")
           .eq("semester", semester)
-
+          .eq("yearlevel", cleanYear)
+        
         semesterSubjects = subjectsData?.map(doc => doc.name) || []
       } catch (err) {
-        const { data: allSubjects } = await supabase.from("subjects").select("name")
-        semesterSubjects = allSubjects?.map(doc => doc.name) || []
+        semesterSubjects = []
       }
-
-      const cleanYear = decodeURIComponent(selectedYear).trim();
       
       const { data: profsData } = await supabase.from("professors").select("*")
       
@@ -164,7 +172,6 @@ function EvaluationContent() {
         
         const hasYear = assignedYearsArray.includes(cleanYear)
         
-        // Check block assignment per subject
         let subjectBlockMap = {}
         if (typeof data.subjectblocks === 'object' && data.subjectblocks !== null) {
           subjectBlockMap = data.subjectblocks
@@ -174,7 +181,6 @@ function EvaluationContent() {
           } catch {}
         }
         
-        // Fallback to main block field if subjectblocks doesn't exist (legacy data)
         let assignedBlocksArray = []
         if (Object.keys(subjectBlockMap).length === 0) {
           if (Array.isArray(data.block)) {
@@ -188,13 +194,10 @@ function EvaluationContent() {
           }
         }
         
-        // Check if any subject is assigned to the student's block
         let hasBlock = false
         if (!studentBlock || Object.keys(subjectBlockMap).length === 0) {
-          // No block filter or legacy data - use old logic
           hasBlock = !studentBlock || assignedBlocksArray.length === 0 || assignedBlocksArray.includes(studentBlock)
         } else {
-          // Check each subject's block assignments
           for (const sub of subjectList) {
             const subBlocks = subjectBlockMap[sub] || []
             if (subBlocks.includes(studentBlock)) {
@@ -204,19 +207,19 @@ function EvaluationContent() {
           }
         }
         
-        // Filter subjects based on student's block
         let filteredSubjects = []
         if (hasYear) {
-          if (Object.keys(subjectBlockMap).length > 0 && studentBlock) {
-            // New logic: filter to only subjects assigned to student's block
-            filteredSubjects = subjectList.filter(sub => {
-              const subBlocks = subjectBlockMap[sub] || []
-              return subBlocks.includes(studentBlock)
-            })
-          } else if (semesterSubjects.length > 0) {
+          if (semesterSubjects.length > 0) {
             filteredSubjects = subjectList.filter(sub => semesterSubjects.includes(sub))
           } else {
             filteredSubjects = subjectList
+          }
+          
+          if (studentBlock && Object.keys(subjectBlockMap).length > 0) {
+            filteredSubjects = filteredSubjects.filter(sub => {
+              const subBlocks = subjectBlockMap[sub] || []
+              return subBlocks.includes(studentBlock)
+            })
           }
         }
         
@@ -269,7 +272,7 @@ function EvaluationContent() {
     const studentId = currentStudent.email.toLowerCase().trim();
     try {
       const evaluationsData = evaluations.map(item => ({
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         professorname: item.name,
         subject: item.selectedSubject,
         yearlevel: selectedYear,
@@ -288,7 +291,7 @@ function EvaluationContent() {
       const { error: statusError } = await supabase
         .from("submissionstatus")
         .upsert({ 
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           email: studentId, 
           hasevaluate: true, 
           evaluateat: new Date().toISOString() 

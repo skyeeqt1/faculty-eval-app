@@ -3,6 +3,14 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
 import bcrypt from 'bcryptjs'
 
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0
+    const v = c === 'x' ? r : (r & 0x3 | 0x8)
+    return v.toString(16)
+  })
+}
+
 export default function StudentListPage() {
   const [loading, setLoading] = useState(true)
   const [students, setStudents] = useState([])
@@ -121,7 +129,7 @@ export default function StudentListPage() {
   const logActivity = async (action, details) => {
     try {
       const adminEmail = sessionStorage.getItem("adminEmail") || "admintest@gmail.com"
-      const logId = crypto.randomUUID()
+      const logId = generateUUID()
       const { data, error } = await supabase.from("audit_logs").insert({
         id: logId,
         action: action,
@@ -132,8 +140,6 @@ export default function StudentListPage() {
       
       if (error) {
         console.error("Audit log error:", error)
-      } else {
-        console.log("Activity logged:", action, details)
       }
     } catch (err) { console.error("Log failed:", err) }
   }
@@ -198,7 +204,7 @@ export default function StudentListPage() {
         fetchStudents()
       } else {
         // Add new student with hashed password
-        const studentId = crypto.randomUUID()
+        const studentId = generateUUID()
         
         // Hash the password
         const hashedPassword = await bcrypt.hash(newStudent.password, 10)

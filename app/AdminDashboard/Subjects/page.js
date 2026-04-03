@@ -2,6 +2,14 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase' 
 
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0
+    const v = c === 'x' ? r : (r & 0x3 | 0x8)
+    return v.toString(16)
+  })
+}
+
 export default function SubjectsManagement() {
   const [loading, setLoading] = useState(true)
   const [subjects, setSubjects] = useState([])
@@ -27,12 +35,10 @@ export default function SubjectsManagement() {
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'subjects' }, 
         (payload) => {
-          console.log('Realtime change received:', payload)
           fetchSubjects()
         }
       )
       .subscribe((status) => {
-        console.log('Realtime subscription status:', status)
       })
 
     return () => {
@@ -89,7 +95,7 @@ export default function SubjectsManagement() {
   const logActivity = async (action, details) => {
     try {
       const adminEmail = sessionStorage.getItem("adminEmail") || "admintest@gmail.com"
-      const logId = crypto.randomUUID()
+      const logId = generateUUID()
       await supabase.from("audit_logs").insert({
         id: logId,
         action: action,
@@ -115,7 +121,7 @@ export default function SubjectsManagement() {
     
     try {
       // Generate a random UUID for the subject
-      const subjectId = crypto.randomUUID()
+      const subjectId = generateUUID()
       
       const { data, error } = await supabase
         .from("subjects")
@@ -143,7 +149,6 @@ export default function SubjectsManagement() {
         return
       }
 
-      console.log("Subject added:", data)
       await logActivity("REGISTER_SUBJECT", `Added: ${newSubName.trim()} for ${newSubYear} - ${newSubSemester}`)
       setNewSubName('')
       setIsAddFormOpen(false)
