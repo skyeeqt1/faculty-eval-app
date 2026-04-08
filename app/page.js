@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react' 
 import { supabase } from '../lib/supabase' 
 import { useRouter } from 'next/navigation'
+import bcrypt from 'bcryptjs'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -43,15 +44,59 @@ export default function LoginPage() {
     }
 
     setLoading(true)
+    const cleanEmail = email.toLowerCase().trim()
 
     try {
-      const response = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      })
+      let result
 
-      const result = await response.json()
+      if (cleanEmail === "admintest@gmail.com") {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: password
+        })
+
+        if (error || !data.user) {
+          setPopup({ show: true, message: "Access Denied: Incorrect password.", isSuccess: false })
+          setLoading(false)
+          return
+        }
+
+        result = { success: true, isAdmin: true, user: { email: data.user.email } }
+      } else {
+        const { data: students, error } = await supabase
+          .from("authorized_students")
+          .select("*")
+          .eq("email", cleanEmail)
+          .single()
+
+        if (error || !students) {
+          setPopup({ show: true, message: "Access Denied: Email not registered.", isSuccess: false })
+          setLoading(false)
+          return
+        }
+
+        const isValidPassword = await bcrypt.compare(password, students.password)
+        
+        if (!isValidPassword) {
+          setPopup({ show: true, message: "Access Denied: Incorrect password.", isSuccess: false })
+          setLoading(false)
+          return
+        }
+
+        result = {
+          success: true,
+          isAdmin: false,
+          student: {
+            email: students.email,
+            firstName: students.firstname,
+            lastName: students.lastname,
+            yearLevel: students.yearlevel,
+            block: students.block,
+            id: students.id,
+            mustchangepassword: students.mustchangepassword
+          }
+        }
+      }
 
       if (!result.success) {
         setPopup({ show: true, message: result.message, isSuccess: false })

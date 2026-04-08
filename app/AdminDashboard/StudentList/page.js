@@ -21,7 +21,6 @@ export default function StudentListPage() {
   
   // Drawer States
   const [activeStudent, setActiveStudent] = useState(null)
-  const [isDrawerVisible, setIsDrawerVisible] = useState(false)
   
   // Registration State
   const [newStudent, setNewStudent] = useState({ 
@@ -41,9 +40,27 @@ export default function StudentListPage() {
   const [toast, setToast] = useState({ show: false, message: '' })
   const [generatedPassword, setGeneratedPassword] = useState('')
   const [copied, setCopied] = useState(false)
+  const [actionPopup, setActionPopup] = useState({ show: false, student: null })
 
   const yearLevels = ["1st Year", "2nd Year", "3rd Year", "4th Year"]
   const blocks = ["Blk A", "Blk B", "Blk C", "Blk D", "Blk E", "Blk F", "Blk G"]
+
+  // Populate form when editing a student
+  useEffect(() => {
+    if (editingStudent) {
+      setNewStudent({
+        firstName: editingStudent.firstname || '',
+        lastName: editingStudent.lastname || '',
+        email: editingStudent.email || '',
+        password: '', // Don't pre-fill password for editing
+        yearLevel: editingStudent.yearlevel || '',
+        block: editingStudent.block || ''
+      })
+    } else {
+      // Reset form when closing
+      setNewStudent({ firstName: '', lastName: '', email: '', password: '', yearLevel: '', block: '' })
+    }
+  }, [editingStudent])
 
   useEffect(() => {
     const channel = supabase
@@ -60,39 +77,6 @@ export default function StudentListPage() {
     }
   }, [])
 
-  // Handle mobile back button to close form
-  useEffect(() => {
-    const handleBackButton = (e) => {
-      if (isAddFormOpen) {
-        e.preventDefault()
-        setIsAddFormOpen(false)
-        setEditingStudent(null)
-      } else if (isDrawerVisible) {
-        e.preventDefault()
-        handleCloseDrawer()
-      } else if (confirmModal.show) {
-        e.preventDefault()
-        setConfirmModal({ show: false, id: null, name: '' })
-      }
-    }
-
-    if (isAddFormOpen) {
-      // Push a state to history so back button will trigger popstate
-      window.history.pushState({ formOpen: true }, '')
-      window.addEventListener('popstate', handleBackButton)
-    } else if (isDrawerVisible) {
-      window.history.pushState({ drawerOpen: true }, '')
-      window.addEventListener('popstate', handleBackButton)
-    } else if (confirmModal.show) {
-      window.history.pushState({ confirmModalOpen: true }, '')
-      window.addEventListener('popstate', handleBackButton)
-    }
-
-    return () => {
-      window.removeEventListener('popstate', handleBackButton)
-    }
-  }, [isAddFormOpen, isDrawerVisible, confirmModal.show])
-
   const fetchStudents = async () => {
     try {
       const { data, error } = await supabase
@@ -108,23 +92,6 @@ export default function StudentListPage() {
       setLoading(false)
     }
   }
-
-  // Populate form when editing a student
-  useEffect(() => {
-    if (editingStudent) {
-      setNewStudent({
-        firstName: editingStudent.firstname || '',
-        lastName: editingStudent.lastname || '',
-        email: editingStudent.email || '',
-        password: '', // Don't show actual password for privacy
-        yearLevel: editingStudent.yearlevel || '',
-        block: editingStudent.block || ''
-      })
-    } else {
-      // Reset form when closing
-      setNewStudent({ firstName: '', lastName: '', email: '', password: '', yearLevel: '', block: '' })
-    }
-  }, [editingStudent])
 
   const logActivity = async (action, details) => {
     try {
@@ -516,19 +483,20 @@ export default function StudentListPage() {
 
       {/* STUDENT TABLE */}
       <section className="flex-1 min-h-0 bg-slate-900/50 border border-white/5 rounded-[2.5rem] overflow-hidden backdrop-blur-sm flex flex-col shadow-2xl mb-24 md:mb-0">
-        <div className="overflow-y-auto custom-scrollbar flex-1 overflow-x-hidden">
-          <table className="w-full text-left min-w-0 border-collapse">
+        <div className="overflow-y-auto custom-scrollbar flex-1 overflow-x-auto">
+          <div className="min-w-[300px]"></div>
+          <table className="w-full text-left border-collapse">
             <thead className="sticky top-0 z-10 bg-[#151c2e]">
               <tr className="border-b border-white/5">
                 <th className="p-4 md:p-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] w-1/3">Student</th>
                 <th className="hidden lg:table-cell p-4 md:p-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Year Level</th>
                 <th className="hidden md:table-cell p-4 md:p-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Email</th>
-                <th className="p-4 md:p-6 text-right text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] w-20">Actions</th>
+                <th className="p-4 md:p-6 text-right text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] w-20 hidden md:table-cell">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {filteredStudents.map((s) => (
-                <tr key={s.id} onClick={() => handleOpenDrawer(s)} className="group hover:bg-white/[0.03] transition-colors cursor-pointer lg:cursor-default">
+                <tr key={s.id} onClick={() => window.innerWidth < 768 && setActionPopup({ show: true, student: s })} className="group hover:bg-white/[0.03] transition-colors cursor-pointer md:cursor-default md:hover:bg-transparent">
                   <td className="p-4 md:p-6">
                     <div className="flex items-center gap-3 md:gap-4">
                       <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/10 flex items-center justify-center text-indigo-400 font-black text-xs shrink-0">
@@ -548,7 +516,7 @@ export default function StudentListPage() {
                   <td className="hidden md:table-cell p-4 md:p-6">
                     <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest truncate block max-w-[150px]">{s.email}</span>
                   </td>
-                  <td className="p-4 md:p-6 text-right w-20">
+                  <td className="p-4 md:p-6 text-right w-20 hidden md:table-cell">
                     <div className="flex items-center justify-end gap-1 md:gap-2">
                       <button onClick={(e) => { e.stopPropagation(); setEditingStudent(s); setIsAddFormOpen(true); }} className="p-2 md:p-3 text-indigo-500 hover:bg-indigo-500/10 rounded-xl transition-all cursor-pointer">
                         <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
@@ -633,6 +601,29 @@ export default function StudentListPage() {
               </button>
             </div>
             <button onClick={() => setGeneratedPassword('')} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase">Done</button>
+          </div>
+        </div>
+      )}
+
+      {/* MOBILE ACTION POPUP */}
+      {actionPopup.show && actionPopup.student && (
+        <div className="fixed inset-0 flex items-center justify-center z-[2000] bg-slate-950/90 backdrop-blur-md p-4">
+          <div className="bg-slate-900 border border-white/10 rounded-[2.5rem] p-8 max-w-sm w-full text-center shadow-2xl">
+            <div className="w-16 h-16 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mx-auto mb-4">
+              <span className="text-indigo-400 font-black text-xl">{actionPopup.student.firstname?.[0]}{actionPopup.student.lastname?.[0]}</span>
+            </div>
+            <h3 className="text-lg font-black text-white uppercase italic leading-tight mb-6">{actionPopup.student.firstname} {actionPopup.student.lastname}</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <button onClick={() => { setActionPopup({ show: false, student: null }); setEditingStudent(actionPopup.student); setIsAddFormOpen(true); }} className="py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase cursor-pointer flex items-center justify-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                Edit
+              </button>
+              <button onClick={() => { setActionPopup({ show: false, student: null }); setConfirmModal({ show: true, id: actionPopup.student.id, name: `${actionPopup.student.firstname} ${actionPopup.student.lastname}` }) }} className="py-4 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase cursor-pointer flex items-center justify-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                Delete
+              </button>
+            </div>
+            <button onClick={() => setActionPopup({ show: false, student: null })} className="mt-4 w-full py-3 text-slate-500 text-[10px] font-bold uppercase tracking-widest cursor-pointer">Cancel</button>
           </div>
         </div>
       )}

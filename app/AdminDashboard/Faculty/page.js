@@ -18,7 +18,6 @@ export default function FacultyManagement() {
   
   // States for editing
   const [editingProf, setEditingProf] = useState(null)
-  const [isLoadingProf, setIsLoadingProf] = useState(false)
   
   // States for Subjects - now with blocks per subject
   const [availableSubjects, setAvailableSubjects] = useState([])
@@ -28,6 +27,7 @@ export default function FacultyManagement() {
 
   const [toast, setToast] = useState({ show: false, message: '' })
   const [confirmModal, setConfirmModal] = useState({ show: false, id: null, name: '' })
+  const [actionPopup, setActionPopup] = useState({ show: false, prof: null })
 
   // Form States
   const [name, setName] = useState('')
@@ -44,12 +44,43 @@ export default function FacultyManagement() {
     if (editingProf) {
       setName(editingProf.name || '')
       setImageUrl(editingProf.imageurl || '')
-      setSelectedYears(Array.isArray(editingProf.assignedyears) ? editingProf.assignedyears : [])
+      
+      // Handle assignedyears - could be array or string
+      let yearsArray = []
+      if (Array.isArray(editingProf.assignedyears)) {
+        yearsArray = editingProf.assignedyears
+      } else if (typeof editingProf.assignedyears === 'string' && editingProf.assignedyears) {
+        try {
+          yearsArray = JSON.parse(editingProf.assignedyears)
+        } catch {
+          yearsArray = [editingProf.assignedyears]
+        }
+      }
+      setSelectedYears(yearsArray)
       
       // Parse subjects with their blocks
       const parsedSubjects = []
-      const profSubjects = Array.isArray(editingProf.subjects) ? editingProf.subjects : []
-      const profBlocks = Array.isArray(editingProf.block) ? editingProf.block : []
+      let profSubjects = []
+      if (Array.isArray(editingProf.subjects)) {
+        profSubjects = editingProf.subjects
+      } else if (typeof editingProf.subjects === 'string' && editingProf.subjects) {
+        try {
+          profSubjects = JSON.parse(editingProf.subjects)
+        } catch {
+          profSubjects = [editingProf.subjects]
+        }
+      }
+      
+      let profBlocks = []
+      if (Array.isArray(editingProf.block)) {
+        profBlocks = editingProf.block
+      } else if (typeof editingProf.block === 'string' && editingProf.block) {
+        try {
+          profBlocks = JSON.parse(editingProf.block)
+        } catch {
+          profBlocks = [editingProf.block]
+        }
+      }
       
       // Check if subjectblocks exists (new format)
       let subjectBlockMap = {}
@@ -80,6 +111,38 @@ export default function FacultyManagement() {
       
       setSelectedSubjects(parsedSubjects)
       setSelectedFile(null)
+
+      // Fetch subjects based on assigned years when editing
+      const fetchSubjectsForEditing = async () => {
+        let years = []
+        if (Array.isArray(editingProf.assignedyears)) {
+          years = editingProf.assignedyears
+        } else if (typeof editingProf.assignedyears === 'string' && editingProf.assignedyears) {
+          try {
+            years = JSON.parse(editingProf.assignedyears)
+          } catch {
+            years = [editingProf.assignedyears]
+          }
+        }
+        if (years.length === 0) return
+        try {
+          const { data, error } = await supabase
+            .from("subjects")
+            .select("*")
+            .in("yearlevel", years)
+          if (!error && data) {
+            const subs = (data || []).map(doc => ({
+              id: doc.id, 
+              title: doc.name, 
+              year: doc.yearlevel 
+            }))
+            setAvailableSubjects(subs)
+          }
+        } catch (err) {
+          console.error("Error fetching subjects:", err)
+        }
+      }
+      fetchSubjectsForEditing()
     } else {
       // Reset form when closing
       setName('')
@@ -153,30 +216,8 @@ export default function FacultyManagement() {
     const fetchRelevantSubjects = async () => {
       if (selectedYears.length === 0) {
         setAvailableSubjects([])
-        if (!editingProf && !isLoadingProf) {
+        if (!editingProf) {
           setSelectedSubjects([])
-        }
-        return
-      }
-      
-      // If loading a professor, don't reset selectedSubjects
-      if (isLoadingProf) {
-        try {
-          const { data, error } = await supabase
-            .from("subjects")
-            .select("*")
-            .in("yearlevel", selectedYears)
-
-          if (!error && data) {
-            const subs = (data || []).map(doc => ({
-              id: doc.id, 
-              title: doc.name, 
-              year: doc.yearlevel 
-            }))
-            setAvailableSubjects(subs)
-          }
-        } catch (err) {
-          console.error("Error fetching subjects:", err)
         }
         return
       }
@@ -205,7 +246,7 @@ export default function FacultyManagement() {
       }
     }
     fetchRelevantSubjects()
-  }, [selectedYears, editingProf, isLoadingProf])
+  }, [selectedYears, editingProf])
 
   const logActivity = async (action, details) => {
     try {
@@ -361,7 +402,7 @@ export default function FacultyManagement() {
         
         await logActivity("UPDATE_INSTRUCTOR", `Updated: ${name.trim()}`)
         setEditingProf(null)
-        setIsLoadingProf(false)
+        
         showToast("Instructor Updated")
         
         // Refresh the professors list
@@ -403,7 +444,7 @@ export default function FacultyManagement() {
       }
       setName(''); setImageUrl(''); setSelectedYears([]); setSelectedSubjects([]); setSelectedFile(null);
       setIsAddFormOpen(false)
-      setIsLoadingProf(false)
+      
     } catch (err) { 
       console.error("Error:", err)
       setUploading(false)
@@ -484,7 +525,7 @@ export default function FacultyManagement() {
                 <h3 className="text-xl font-black text-white uppercase italic tracking-tight">{editingProf ? 'Edit Instructor' : 'Register Instructor'}</h3>
                 <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-1">{editingProf ? 'Update instructor details' : 'Add new faculty member'}</p>
               </div>
-              <button onClick={() => { setIsAddFormOpen(false); setEditingProf(null); setIsLoadingProf(false); }} className="text-slate-500 hover:text-white cursor-pointer"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg></button>
+              <button onClick={() => { setIsAddFormOpen(false); setEditingProf(null); ; }} className="text-slate-500 hover:text-white cursor-pointer"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg></button>
             </div>
 
             <form onSubmit={handleAddFaculty} className="space-y-6">
@@ -611,7 +652,7 @@ export default function FacultyManagement() {
               )}
 
               <div className="flex gap-3 pt-12">
-                <button type="button" onClick={() => { setIsAddFormOpen(false); setEditingProf(null); setIsLoadingProf(false); }} className="flex-1 py-4 bg-slate-800 text-slate-400 font-black text-[10px] uppercase rounded-2xl cursor-pointer">Discard</button>
+                <button type="button" onClick={() => { setIsAddFormOpen(false); setEditingProf(null); ; }} className="flex-1 py-4 bg-slate-800 text-slate-400 font-black text-[10px] uppercase rounded-2xl cursor-pointer">Discard</button>
                 <button type="submit" disabled={uploading} className="flex-[2] py-4 bg-indigo-600 text-white font-black text-[10px] uppercase rounded-2xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">{uploading ? 'Uploading...' : (editingProf ? 'Update Faculty' : 'Confirm Faculty')}</button>
               </div>
             </form>
@@ -621,41 +662,39 @@ export default function FacultyManagement() {
 
       {/* LIST TABLE */}
       <section className="flex-1 min-h-0 bg-slate-900/50 border border-white/5 rounded-[2.5rem] overflow-hidden backdrop-blur-sm flex flex-col shadow-2xl mb-24 md:mb-0">
-        <div className="overflow-y-auto custom-scrollbar flex-1 overflow-x-hidden">
-          <table className="w-full text-left min-w-0 border-collapse">
+        <div className="overflow-y-auto custom-scrollbar flex-1 overflow-x-auto">
+          <div className="min-w-[300px]"></div>
+          <table className="w-full text-left border-collapse">
             <thead className="sticky top-0 z-10 bg-[#151c2e]">
               <tr className="border-b border-white/5">
-                <th className="p-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Instructor</th>
-                <th className="p-6 text-right text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Action</th>
+                <th className="p-4 md:p-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Instructor</th>
+                <th className="p-4 md:p-6 text-right text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] hidden md:table-cell">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {filteredProfs.map((prof) => (
-                <tr key={prof.id} className="group hover:bg-white/[0.03] transition-colors">
-                  <td className="p-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/10 flex items-center justify-center overflow-hidden shrink-0">
+                <tr 
+                  key={prof.id} 
+                  onClick={() => window.innerWidth < 768 && setActionPopup({ show: true, prof })}
+                  className="group hover:bg-white/[0.03] transition-colors cursor-pointer md:cursor-default md:hover:bg-transparent"
+                >
+                  <td className="p-4 md:p-6">
+                    <div className="flex items-center gap-3 md:gap-4">
+                      <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/10 flex items-center justify-center overflow-hidden shrink-0">
                         {prof.imageurl ? <img src={prof.imageurl} alt="" className="w-full h-full object-cover" /> : <span className="text-indigo-400 font-black text-xs">{prof.name[0]}</span>}
                       </div>
-                      <div className="flex flex-col">
+                      <div className="flex flex-col min-w-0">
                         <span className="font-black text-slate-200 uppercase italic text-sm group-hover:text-indigo-400 truncate transition-colors">{prof.name}</span>
-                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
-                          {Array.isArray(prof.assignedyears) 
-                            ? prof.assignedyears.join(" • ") 
-                            : typeof prof.assignedyears === 'string' 
-                              ? prof.assignedyears.replace(/[\[\]"]/g, '') 
-                              : prof.assignedyears}
-                        </span>
                       </div>
                     </div>
                   </td>
-                  <td className="p-6 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button onClick={() => { setIsLoadingProf(true); setEditingProf(prof); setIsAddFormOpen(true); }} className="p-3 text-indigo-500 hover:bg-indigo-500/10 rounded-xl transition-all cursor-pointer">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                  <td className="p-4 md:p-6 text-right hidden md:table-cell">
+                    <div className="flex items-center justify-end gap-1 md:gap-2">
+                      <button onClick={(e) => { e.stopPropagation(); setEditingProf(prof); setIsAddFormOpen(true); }} className="p-2 md:p-3 text-indigo-500 hover:bg-indigo-500/10 rounded-xl transition-all cursor-pointer">
+                        <svg className="w-4 md:w-5 h-4 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                       </button>
-                      <button onClick={() => setConfirmModal({ show: true, id: prof.id, name: prof.name })} className="p-3 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all cursor-pointer">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      <button onClick={(e) => { e.stopPropagation(); setConfirmModal({ show: true, id: prof.id, name: prof.name }) }} className="p-2 md:p-3 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all cursor-pointer">
+                        <svg className="w-4 md:w-5 h-4 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
                     </div>
                   </td>
@@ -683,6 +722,33 @@ export default function FacultyManagement() {
               <button onClick={() => setConfirmModal({ show: false, id: null, name: '' })} className="py-4 bg-slate-800 text-slate-300 rounded-2xl font-black text-[10px] uppercase cursor-pointer">Back</button>
               <button onClick={confirmDelete} className="py-4 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase cursor-pointer">Confirm</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MOBILE ACTION POPUP */}
+      {actionPopup.show && actionPopup.prof && (
+        <div className="fixed inset-0 flex items-center justify-center z-[2000] bg-slate-950/90 backdrop-blur-md p-4">
+          <div className="bg-slate-900 border border-white/10 rounded-[2.5rem] p-8 max-w-sm w-full text-center shadow-2xl">
+            <div className="w-16 h-16 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mx-auto mb-4">
+              {actionPopup.prof.imageurl ? (
+                <img src={actionPopup.prof.imageurl} alt="" className="w-full h-full object-cover rounded-full" />
+              ) : (
+                <span className="text-indigo-400 font-black text-xl">{actionPopup.prof.name[0]}</span>
+              )}
+            </div>
+            <h3 className="text-lg font-black text-white uppercase italic leading-tight mb-6">{actionPopup.prof.name}</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <button onClick={() => { setActionPopup({ show: false, prof: null }); setEditingProf(actionPopup.prof); setIsAddFormOpen(true); }} className="py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase cursor-pointer flex items-center justify-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                Edit
+              </button>
+              <button onClick={() => { setActionPopup({ show: false, prof: null }); setConfirmModal({ show: true, id: actionPopup.prof.id, name: actionPopup.prof.name }) }} className="py-4 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase cursor-pointer flex items-center justify-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                Delete
+              </button>
+            </div>
+            <button onClick={() => setActionPopup({ show: false, prof: null })} className="mt-4 w-full py-3 text-slate-500 text-[10px] font-bold uppercase tracking-widest cursor-pointer">Cancel</button>
           </div>
         </div>
       )}
