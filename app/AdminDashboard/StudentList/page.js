@@ -114,12 +114,10 @@ export default function StudentListPage() {
   const handleOpenDrawer = (student) => {
     if (window.innerWidth < 1024) {
       setActiveStudent(student)
-      setTimeout(() => setIsDrawerVisible(true), 10)
     }
   }
 
   const handleCloseDrawer = () => {
-    setIsDrawerVisible(false)
     setTimeout(() => setActiveStudent(null), 400)
   }
 
@@ -285,12 +283,20 @@ export default function StudentListPage() {
   const handleDelete = async () => {
     if (!deleteReason.trim()) return showToast("Reason required")
     try {
-      const { error } = await supabase
+      const { error, data } = await supabase
         .from("authorized_students")
         .delete()
         .eq("id", confirmModal.id)
 
-      if (error) throw error
+      if (error) {
+        console.error("Delete error:", error)
+        showToast(error.message || "Remove failed")
+        return
+      }
+
+      if (!data || data.length === 0) {
+        console.log("Delete returned empty - checking if student still exists")
+      }
       
       await logActivity("REMOVE_ACCESS", `Removed: ${confirmModal.name}. Reason: ${deleteReason}`)
       setConfirmModal({ show: false, id: null, name: '' })
@@ -298,9 +304,11 @@ export default function StudentListPage() {
       handleCloseDrawer()
       showToast("Access Removed")
       
-      // Refresh the students list
       fetchStudents()
-    } catch (err) { showToast("Remove failed") }
+    } catch (err) { 
+      console.error("Delete catch error:", err)
+      showToast("Remove failed") 
+    }
   }
 
   const showToast = (msg) => {
