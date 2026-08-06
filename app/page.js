@@ -1,8 +1,11 @@
 'use client'
-import { useEffect, useState } from 'react' 
-import { supabase } from '../lib/supabase' 
+import { useEffect, useState } from 'react'
+import { supabase } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
-import bcrypt from 'bcryptjs'
+import { comparePassword } from '../lib/bcrypt'
+import Toast from '../components/ui/Toast'
+import ThemeToggle from '../components/ui/ThemeToggle'
+import { ADMIN_EMAIL } from '../lib/constants'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -15,12 +18,12 @@ export default function LoginPage() {
     const savedStudent = sessionStorage.getItem("studentSession")
     if (savedStudent) {
       router.replace('/StudentDashboard')
-      return 
+      return
     }
 
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      if (session && session.user.email.toLowerCase() === "admintest@gmail.com") {
+      if (session && session.user.email.toLowerCase() === ADMIN_EMAIL) {
         sessionStorage.setItem("adminSession", JSON.stringify({ email: session.user.email }))
         router.replace('/AdminDashboard')
       }
@@ -49,7 +52,7 @@ export default function LoginPage() {
     try {
       let result
 
-      if (cleanEmail === "admintest@gmail.com") {
+      if (cleanEmail === ADMIN_EMAIL) {
         const { data, error } = await supabase.auth.signInWithPassword({
           email: cleanEmail,
           password: password
@@ -75,8 +78,8 @@ export default function LoginPage() {
           return
         }
 
-        const isValidPassword = await bcrypt.compare(password, students.password)
-        
+        const isValidPassword = await comparePassword(password, students.password)
+
         if (!isValidPassword) {
           setPopup({ show: true, message: "Access Denied: Incorrect password.", isSuccess: false })
           setLoading(false)
@@ -136,67 +139,102 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-start md:justify-center px-4 pt-12 md:pt-0 relative overflow-hidden font-sans">
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-600/10 blur-[120px]" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-violet-600/10 blur-[120px]" />
-      
+    <div className="min-h-screen page-bg flex flex-col items-center justify-center px-4 relative overflow-hidden">
+
+      {/* Theme toggle — top right */}
+      <div className="absolute top-6 right-6 z-20">
+        <ThemeToggle />
+      </div>
+
+      {/* Premium floating ambient orbs */}
+      <div className="ambient-orb w-[500px] h-[500px] bg-indigo-400/15 dark:bg-indigo-500/10 top-[-15%] left-[-12%] animate-float" />
+      <div className="ambient-orb w-[400px] h-[400px] bg-violet-400/12 dark:bg-violet-500/8 bottom-[-12%] right-[-10%] animate-float" style={{ animationDelay: '2s' }} />
+      <div className="ambient-orb w-[250px] h-[250px] bg-purple-300/10 dark:bg-purple-400/6 top-[30%] right-[20%] animate-float" style={{ animationDelay: '1s' }} />
+
+      {/* Notice modal */}
       {popup.show && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
-          <div className="bg-slate-900 border border-white/10 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl animate-pop-in relative overflow-hidden">
-            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 ${popup.isSuccess ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'}`}>
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/30 dark:bg-black/50 backdrop-blur-xl" onClick={() => popup.isSuccess ? null : setPopup({ show: false, message: '', isSuccess: false })} />
+          <div className="relative card-glass w-full max-w-sm p-8 shadow-elevated animate-pop-in">
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg ${popup.isSuccess ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400 shadow-emerald-500/20' : 'bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-400 shadow-rose-500/20'}`}>
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
                 {popup.isSuccess ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 )}
               </svg>
             </div>
-            <h2 className="text-lg font-black text-center text-white mb-2 italic uppercase tracking-wider">{popup.isSuccess ? 'Verified' : 'Notice'}</h2>
-            <p className="text-slate-400 text-center text-xs md:text-sm mb-6 leading-relaxed font-medium">{popup.message}</p>
+            <h2 className="text-lg font-extrabold text-center text-slate-900 dark:text-white mb-2">{popup.isSuccess ? 'Success' : 'Notice'}</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-center text-sm mb-6 leading-relaxed">{popup.message}</p>
             {!popup.isSuccess && (
-              <button onClick={() => setPopup({ show: false, message: '', isSuccess: false })} className="cursor-pointer w-full bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-500 transition-all uppercase text-[10px] tracking-widest shadow-lg shadow-indigo-600/20">Continue</button>
+              <button onClick={() => setPopup({ show: false, message: '', isSuccess: false })} className="btn btn-primary w-full py-3.5 text-sm">Continue</button>
             )}
           </div>
         </div>
       )}
 
-      <div className={`bg-slate-900 w-full max-w-md p-8 md:p-12 rounded-[2.5rem] shadow-2xl border border-white/5 transition-all duration-500 z-10 ${popup.show ? 'blur-md opacity-50 scale-95' : 'opacity-100'}`}>
-        <div className="text-center mb-8 md:mb-10">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-[11px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-6">
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
-            Security Protocol
+      {/* Main card — glass morphism split layout */}
+      <div className={`w-full max-w-md lg:max-w-5xl grid grid-cols-1 lg:grid-cols-2 card-glass rounded-3xl overflow-hidden shadow-elevated z-10 transition-all duration-500 ${popup.show ? 'blur-md opacity-50 scale-[0.97]' : 'opacity-100'}`}>
+
+        {/* Brand showcase — premium gradient panel */}
+        <div className="hidden lg:flex flex-col justify-between p-12 brand-gradient text-white relative overflow-hidden">
+          {/* Ambient light effects inside panel */}
+          <div className="absolute -right-20 -top-20 w-72 h-72 rounded-full bg-white/10 blur-3xl animate-glow" />
+          <div className="absolute -bottom-24 -left-14 w-80 h-80 rounded-full bg-white/8 blur-3xl animate-glow" style={{ animationDelay: '1.5s' }} />
+
+          <div className="relative z-10">
+            <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center mb-8 backdrop-blur-sm shadow-lg border border-white/10">
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 19l-7-3V9l7-3 7 3v7l-7 3z" /><path d="M9 12v3m6-3v3M9 12V9m6 3V9" />
+              </svg>
+            </div>
+            <h1 className="text-4xl font-black tracking-tight leading-[1.1]">Faculty<br />Evaluation</h1>
+            <p className="mt-5 text-white/75 text-sm leading-relaxed max-w-xs">
+              A secure and anonymous way for students to rate their instructors — helping the institution grow every semester.
+            </p>
           </div>
-          <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic leading-none">
-            Faculty <span className="text-indigo-500">Evaluation</span>
-          </h2>
-          <p className="text-slate-500 mt-3 text-[10px] font-bold uppercase tracking-[0.3em]">Access Portal</p>
+
+          <div className="relative z-10 flex flex-wrap gap-2.5">
+            {['Anonymous', 'Encrypted', 'Real-time'].map(t => (
+              <span key={t} className="px-3.5 py-1.5 rounded-full bg-white/12 text-[11px] font-semibold backdrop-blur-sm border border-white/10">{t}</span>
+            ))}
+          </div>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-5 md:space-y-6">
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Academic Email</label>
-            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-slate-800 p-4 rounded-2xl border border-slate-700 focus:border-indigo-500 text-white outline-none text-sm transition-all" placeholder="Username" />
+        {/* Form side — premium glass */}
+        <div className="p-8 sm:p-12 flex flex-col justify-center">
+          <div className="mb-8">
+            <div className="lg:hidden inline-flex items-center gap-2 px-3.5 py-1.5 bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 rounded-full text-[11px] font-bold mb-6 border border-indigo-100 dark:border-indigo-500/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+              Faculty Evaluation
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">Welcome back</h2>
+            <p className="text-slate-500 dark:text-slate-400 mt-2.5 text-sm leading-relaxed">Sign in to your portal to continue.</p>
           </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Security Password</label>
-            <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-slate-800 p-4 rounded-2xl border border-slate-700 focus:border-indigo-500 text-white outline-none text-sm transition-all" placeholder="Password" />
-          </div>
-          <button type="submit" disabled={loading} className="cursor-pointer w-full mt-4 bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-indigo-500 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/10">
-            {loading ? "Verifying..." : "Enter Portal"}
-          </button>
-        </form>
-      </div>
 
-      <style jsx>{`
-        @keyframes pop-in { 0% { transform: scale(0.95); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-        .animate-pop-in { animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-        
-        /* Ensures the background stays fixed on mobile even when keyboard pops up */
-        @media (max-width: 768px) {
-          .min-h-screen { min-height: -webkit-fill-available; }
-        }
-      `}</style>
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div className="space-y-2">
+              <label className="overline block">Academic Email</label>
+              <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="input" placeholder="username@email.com" autoComplete="email" />
+            </div>
+            <div className="space-y-2">
+              <label className="overline block">Password</label>
+              <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="input" placeholder="Enter your password" autoComplete="current-password" />
+            </div>
+            <button type="submit" disabled={loading} className="btn btn-primary w-full mt-2 py-4 text-sm font-bold">
+              {loading ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
+                  Signing in...
+                </>
+              ) : "Sign In"}
+            </button>
+          </form>
+
+          <p className="text-center text-slate-400 dark:text-slate-500 text-xs mt-8 font-medium">By continuing, you agree to our terms and privacy policy.</p>
+        </div>
+      </div>
     </div>
   )
 }

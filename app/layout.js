@@ -1,49 +1,35 @@
-'use client'
-import { useEffect } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
-import { App } from '@capacitor/app'
-import { StatusBar, Style } from '@capacitor/status-bar'
+import RootClient from '../components/RootClient'
+import { APP_NAME, APP_DESCRIPTION } from '../lib/constants'
 import './globals.css'
 
+export const metadata = {
+  title: `${APP_NAME} — Student Portal`,
+  description: APP_DESCRIPTION,
+  manifest: '/manifest.webmanifest',
+  applicationName: APP_NAME,
+  icons: {
+    icon: '/icons/icon.svg',
+    apple: '/icons/icon.svg',
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: APP_NAME,
+  },
+}
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#f4f5fb',
+}
+
 export default function RootLayout({ children }) {
-  const router = useRouter()
-  const pathname = usePathname()
-
-  useEffect(() => {
-    // Status Bar Setup
-    const setStatus = async () => {
-      try {
-        await StatusBar.setBackgroundColor({ color: '#0f172a' });
-        await StatusBar.setStyle({ style: Style.Dark });
-      } catch (e) { console.log("Running in Web Mode") }
-    };
-    setStatus();
-  }, []);
-
-  useEffect(() => {
-    // Hardware Back Button
-    const setupListener = async () => {
-      const backListener = await App.addListener('backButton', () => {
-        if (pathname === '/' || pathname === '/login') {
-          App.exitApp();
-        } else {
-          router.back();
-        }
-      });
-      return backListener;
-    };
-
-    const listenerPromise = setupListener();
-
-    return () => {
-      listenerPromise.then(l => l.remove());
-    };
-  }, [pathname, router]);
-
   return (
     <html lang="en">
-      <body className="bg-[#0f172a] text-slate-200 min-h-screen pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-        {children}
+      <body>
+        <RootClient>{children}</RootClient>
       </body>
     </html>
   )

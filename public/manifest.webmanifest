@@ -1,0 +1,18 @@
+{
+  "name": "Faculty Evaluation",
+  "short_name": "Faculty Eval",
+  "description": "A secure and anonymous way for students to rate their instructors.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#eef1ff",
+  "theme_color": "#eef1ff",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

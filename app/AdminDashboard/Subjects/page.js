@@ -1,14 +1,11 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { supabase } from '../../../lib/supabase' 
-
-function generateUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0
-    const v = c === 'x' ? r : (r & 0x3 | 0x8)
-    return v.toString(16)
-  })
-}
+import { supabase } from '../../../lib/supabase'
+import Toast from '../../../components/ui/Toast'
+import Modal from '../../../components/ui/Modal'
+import { generateUUID } from '../../../lib/utils'
+import { logActivity } from '../../../lib/logger'
+import { YEAR_LEVELS, SEMESTERS } from '../../../lib/constants'
 
 export default function SubjectsManagement() {
   const [loading, setLoading] = useState(true)
@@ -17,10 +14,10 @@ export default function SubjectsManagement() {
   const [newSubYear, setNewSubYear] = useState('1st Year')
   const [newSubSemester, setNewSubSemester] = useState('1st Semester')
   const [isAddFormOpen, setIsAddFormOpen] = useState(false)
-  
+
   const [selectedFilter, setSelectedFilter] = useState('All')
-  const yearLevels = ['All', '1st Year', '2nd Year', '3rd Year', '4th Year']
-  const semesters = ['1st Semester', '2nd Semester']
+  const yearLevels = ['All', ...YEAR_LEVELS]
+  const semesters = SEMESTERS
 
   const [toast, setToast] = useState({ show: false, message: '' })
   const [confirmModal, setConfirmModal] = useState({ show: false, id: null, name: '' })
@@ -32,8 +29,8 @@ export default function SubjectsManagement() {
     // Set up realtime subscription
     const channel = supabase
       .channel('subjects-realtime')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'subjects' }, 
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'subjects' },
         (payload) => {
           fetchSubjects()
         }
@@ -59,7 +56,6 @@ export default function SubjectsManagement() {
     }
 
     if (isAddFormOpen) {
-      // Push a state to history so back button will trigger popstate
       window.history.pushState({ formOpen: true }, '')
       window.addEventListener('popstate', handleBackButton)
     } else if (confirmModal.show) {
@@ -88,41 +84,27 @@ export default function SubjectsManagement() {
     }
   }
 
-  const filteredSubjects = selectedFilter === 'All' 
-    ? subjects 
+  const filteredSubjects = selectedFilter === 'All'
+    ? subjects
     : subjects.filter(sub => sub.yearlevel === selectedFilter)
-
-  const logActivity = async (action, details) => {
-    try {
-      const adminEmail = sessionStorage.getItem("adminEmail") || "admintest@gmail.com"
-      const logId = generateUUID()
-      await supabase.from("audit_logs").insert({
-        id: logId,
-        action: action,
-        adminemail: adminEmail,
-        details: details,
-        timestamp: new Date().toISOString()
-      })
-    } catch (err) { console.error("Log failed:", err) }
-  }
 
   const handleAddSubject = async (e) => {
     e.preventDefault()
     if (!newSubName.trim()) return showToast("Subject name required")
-    
+
     // Check if subject already exists with same name
-    const exists = subjects.some(s => 
+    const exists = subjects.some(s =>
       s.name.toLowerCase() === newSubName.trim().toLowerCase()
     )
     if (exists) {
       showToast("Subject name already exists")
       return
     }
-    
+
     try {
       // Generate a random UUID for the subject
       const subjectId = generateUUID()
-      
+
       const { data, error } = await supabase
         .from("subjects")
         .insert({
@@ -153,12 +135,11 @@ export default function SubjectsManagement() {
       setNewSubName('')
       setIsAddFormOpen(false)
       showToast("Subject Registered")
-      
-      // Refresh the subjects list
+
       fetchSubjects()
-    } catch (err) { 
+    } catch (err) {
       console.error("Error:", err)
-      showToast("Error adding subject") 
+      showToast("Error adding subject")
     }
   }
 
@@ -171,12 +152,11 @@ export default function SubjectsManagement() {
         .eq("id", confirmModal.id)
 
       if (error) throw error
-      
+
       await logActivity("REMOVE_SUBJECT", `Deleted: ${confirmModal.name}`)
       setConfirmModal({ show: false, id: null, name: '' })
       showToast("Subject Removed")
-      
-      // Refresh the subjects list
+
       fetchSubjects()
     } catch (err) { showToast("Delete failed") }
   }
@@ -187,38 +167,38 @@ export default function SubjectsManagement() {
   }
 
   if (loading) return (
-    <div className="flex-1 flex items-center justify-center bg-[#0f172a]">
-      <div className="text-indigo-400 font-black uppercase tracking-[0.3em] animate-pulse">Syncing Subjects...</div>
+    <div className="flex-1 flex items-center justify-center page-bg">
+      <div className="text-sm font-medium text-indigo-500 dark:text-indigo-300 animate-pulse">Loading subjects...</div>
     </div>
   )
 
   return (
-    <div className="p-4 md:p-8 lg:p-12 max-w-6xl mx-auto w-full h-screen flex flex-col space-y-4 md:space-y-6 overflow-hidden">
-      
+    <div className="p-4 md:p-8 lg:p-12 max-w-6xl mx-auto w-full h-screen flex flex-col space-y-4 md:space-y-6 overflow-hidden page-bg">
+
       {/* HEADER - HIDDEN ON MOBILE */}
       <div className="hidden md:flex items-center justify-between gap-6 shrink-0">
         <div>
-          <h2 className="text-2xl font-black text-white uppercase italic tracking-tight">Subject Management</h2>
-          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-1">Showing {filteredSubjects.length} of {subjects.length} total</p>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Subject Management</h2>
+          <p className="overline mt-1">Showing {filteredSubjects.length} of {subjects.length} total</p>
         </div>
-        <button 
-          onClick={() => setIsAddFormOpen(true)} 
-          className="px-6 py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest cursor-pointer hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 transition-all active:scale-95"
+        <button
+          onClick={() => setIsAddFormOpen(true)}
+          className="btn btn-primary px-5 py-3 text-sm"
         >
           Add New Subject
         </button>
       </div>
 
-      {/* MODAL-STYLE ADD FORM (Student List Format) */}
+      {/* MODAL-STYLE ADD FORM */}
       {isAddFormOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
-          <section className="w-full max-w-xl bg-slate-900 border border-indigo-500/30 p-8 rounded-[2.5rem] shadow-2xl animate-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-fade-in">
+          <section className="w-full max-w-xl card p-8 animate-pop-in">
             <div className="flex justify-between items-center mb-8">
               <div>
-                <h3 className="text-xl font-black text-white uppercase italic tracking-tight">Register Subject</h3>
-                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-1">Create a new curriculum entry</p>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Register Subject</h3>
+                <p className="overline mt-1">Create a new curriculum entry</p>
               </div>
-              <button onClick={() => setIsAddFormOpen(false)} className="text-slate-500 hover:text-white transition-colors">
+              <button onClick={() => setIsAddFormOpen(false)} className="text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -226,44 +206,44 @@ export default function SubjectsManagement() {
             <form onSubmit={handleAddSubject} className="space-y-6">
               <div className="space-y-4">
                 <div className="group">
-                  <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1 mb-2 block">Subject Name</label>
-                  <input 
-                    type="text" placeholder="Subject Name" value={newSubName} 
-                    onChange={(e) => setNewSubName(e.target.value)} 
-                    className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-6 py-4 text-sm outline-none text-white focus:border-indigo-500 transition-all group-hover:bg-slate-800"
+                  <label className="overline ml-1 mb-2 block">Subject Name</label>
+                  <input
+                    type="text" placeholder="Subject Name" value={newSubName}
+                    onChange={(e) => setNewSubName(e.target.value)}
+                    className="input"
                   />
                 </div>
 
                 <div className="group">
-                  <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1 mb-2 block">Year Level Assignment</label>
-                  <select 
+                  <label className="overline ml-1 mb-2 block">Year Level Assignment</label>
+                  <select
                     value={newSubYear} onChange={(e) => setNewSubYear(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-6 py-4 text-sm outline-none text-white focus:border-indigo-500 cursor-pointer transition-all group-hover:bg-slate-800"
+                    className="input cursor-pointer"
                   >
-                    {yearLevels.filter(y => y !== 'All').map(year => (
-                      <option key={year} value={year} className="bg-slate-900">{year.toUpperCase()}</option>
+                    {YEAR_LEVELS.map(year => (
+                      <option key={year} value={year} className="bg-white dark:bg-slate-900">{year}</option>
                     ))}
                   </select>
                 </div>
 
                 <div className="group">
-                  <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1 mb-2 block">Semester</label>
-                  <select 
+                  <label className="overline ml-1 mb-2 block">Semester</label>
+                  <select
                     value={newSubSemester} onChange={(e) => setNewSubSemester(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-6 py-4 text-sm outline-none text-white focus:border-indigo-500 cursor-pointer transition-all group-hover:bg-slate-800"
+                    className="input cursor-pointer"
                   >
                     {semesters.map(sem => (
-                      <option key={sem} value={sem} className="bg-slate-900">{sem.toUpperCase()}</option>
+                      <option key={sem} value={sem} className="bg-white dark:bg-slate-900">{sem}</option>
                     ))}
                   </select>
                 </div>
               </div>
 
               <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setIsAddFormOpen(false)} className="flex-1 py-4 bg-slate-800 text-slate-400 font-black text-[10px] uppercase tracking-widest rounded-2xl hover:bg-slate-700 transition-all">
+                <button type="button" onClick={() => setIsAddFormOpen(false)} className="flex-1 btn btn-ghost py-3 text-sm transition-all">
                   Discard
                 </button>
-                <button type="submit" className="flex-[2] py-4 bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 transition-all active:scale-95">
+                <button type="submit" className="flex-[2] btn btn-primary py-3 text-sm transition-all">
                   Confirm Subject
                 </button>
               </div>
@@ -275,13 +255,13 @@ export default function SubjectsManagement() {
       {/* ADAPTIVE FILTER SECTION */}
       <div className="shrink-0">
         <div className="md:hidden relative">
-          <select 
+          <select
             value={selectedFilter}
             onChange={(e) => setSelectedFilter(e.target.value)}
-            className="w-full bg-slate-900 text-white border border-slate-700 rounded-2xl px-6 py-4 text-sm appearance-none outline-none focus:border-indigo-500"
+            className="w-full input cursor-pointer"
           >
             {yearLevels.map((year) => (
-              <option key={year} value={year} className="bg-slate-900 text-white">FILTER: {year.toUpperCase()}</option>
+              <option key={year} value={year} className="bg-white dark:bg-slate-900">{year}</option>
             ))}
           </select>
           <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-indigo-500">
@@ -294,10 +274,10 @@ export default function SubjectsManagement() {
             <button
               key={year}
               onClick={() => setSelectedFilter(year)}
-              className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap cursor-pointer ${
-                selectedFilter === year 
-                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
-                : 'bg-slate-900 text-slate-500 border border-white/5 hover:bg-slate-800'
+              className={`px-5 py-2.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                selectedFilter === year
+                ? 'btn btn-primary border-transparent'
+                : 'surface-muted text-slate-500 dark:text-slate-400 border border-slate-200/60 dark:border-indigo-500/8 hover:bg-slate-50 dark:hover:bg-indigo-500/8 hover:text-indigo-600 dark:hover:text-indigo-300'
               }`}
             >
               {year}
@@ -307,35 +287,35 @@ export default function SubjectsManagement() {
       </div>
 
       {/* TABLE SECTION */}
-      <section className="flex-1 min-h-0 bg-slate-900/50 border border-white/5 rounded-[2.5rem] md:rounded-[2.5rem] rounded-b-none overflow-hidden flex flex-col shadow-2xl">
-        <div className="overflow-y-auto custom-scrollbar flex-1">
+      <section className="flex-1 min-h-0 card overflow-hidden flex flex-col">
+        <div className="overflow-y-auto scrollbar-thin flex-1">
           <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 z-10 bg-[#151c2e]">
-              <tr className="border-b border-white/5">
-                <th className="p-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Subject Title</th>
-                <th className="hidden md:table-cell p-6 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Level</th>
-                <th className="p-6 text-right text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Actions</th>
+            <thead className="sticky top-0 z-10">
+              <tr className="border-b border-slate-100 dark:border-slate-800">
+                <th className="p-6 overline">Subject Title</th>
+                <th className="hidden md:table-cell p-6 overline">Level</th>
+                <th className="p-6 overline text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filteredSubjects.length > 0 ? (
                 filteredSubjects.map((sub) => (
-                  <tr key={sub.id} className="group hover:bg-white/[0.03] transition-colors">
+                  <tr key={sub.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                     <td className="p-5 md:p-6">
                       <div className="flex flex-col">
-                        <span className="font-black text-slate-200 uppercase italic text-sm group-hover:text-indigo-400 transition-colors truncate">{sub.name}</span>
-                        <span className="md:hidden text-[9px] text-indigo-500 font-bold uppercase tracking-widest mt-1">{sub.yearlevel}</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-100 text-sm group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition-colors truncate">{sub.name}</span>
+                        <span className="md:hidden text-xs text-indigo-600 dark:text-indigo-300 font-medium mt-1">{sub.yearlevel}</span>
                       </div>
                     </td>
                     <td className="hidden md:table-cell p-6">
-                      <span className="px-4 py-1.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/10 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                      <span className="px-4 py-1.5 bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-500/20 rounded-lg text-xs font-medium">
                         {sub.yearlevel}
                       </span>
                     </td>
                     <td className="p-6 text-right">
-                      <button 
-                        onClick={() => setConfirmModal({ show: true, id: sub.id, name: sub.name })} 
-                        className="p-3 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all cursor-pointer"
+                      <button
+                        onClick={() => setConfirmModal({ show: true, id: sub.id, name: sub.name })}
+                        className="p-3 text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/15 rounded-xl transition-all cursor-pointer"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
@@ -345,7 +325,7 @@ export default function SubjectsManagement() {
               ) : (
                 <tr>
                   <td colSpan="3" className="p-20 text-center">
-                    <p className="text-slate-600 font-black text-[10px] uppercase tracking-widest italic">No subjects found</p>
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">No subjects found</p>
                   </td>
                 </tr>
               )}
@@ -356,42 +336,26 @@ export default function SubjectsManagement() {
 
       {/* MOBILE FLOATING ACTION BUTTON */}
       {!isAddFormOpen && (
-        <button 
+        <button
           onClick={() => setIsAddFormOpen(true)}
-          className="md:hidden fixed bottom-13 right-6 w-14 h-14 bg-indigo-600 text-white rounded-2xl shadow-2xl flex items-center justify-center z-50 active:scale-90 transition-transform"
+          className="md:hidden fixed w-14 h-14 btn btn-primary rounded-2xl shadow-2xl flex items-center justify-center z-50"
+          style={{ right: '1.5rem', bottom: 'calc(1.5rem + var(--sab))' }}
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
         </button>
       )}
 
       {/* CONFIRM DELETE MODAL */}
-      {confirmModal.show && (
-        <div className="fixed inset-0 flex items-center justify-center z-[2000] bg-slate-950/90 backdrop-blur-md p-4">
-          <div className="bg-slate-900 border border-white/10 rounded-[2.5rem] p-8 max-w-sm w-full text-center shadow-2xl animate-in fade-in zoom-in duration-200">
-            <h3 className="text-xl font-black text-white mb-2 uppercase italic leading-tight">Remove Subject?</h3>
-            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-8 leading-relaxed">Confirm deletion of <br/> <span className="text-white italic">{confirmModal.name}</span></p>
-            <div className="grid grid-cols-2 gap-4">
-              <button onClick={() => setConfirmModal({ show: false, id: null, name: '' })} className="py-4 bg-slate-800 text-slate-300 rounded-2xl font-black text-[10px] uppercase cursor-pointer">Back</button>
-              <button onClick={confirmDelete} className="py-4 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase cursor-pointer shadow-lg shadow-rose-600/20">Remove</button>
-            </div>
-          </div>
+      <Modal open={confirmModal.show} onClose={() => setConfirmModal({ show: false, id: null, name: '' })}>
+        <h3 className="text-xl font-bold text-slate-900 dark:text-slate-50 mb-2 leading-tight">Remove Subject?</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">Confirm deletion of <br/> <span className="font-semibold text-slate-900 dark:text-slate-100">{confirmModal.name}</span></p>
+        <div className="grid grid-cols-2 gap-4">
+          <button onClick={() => setConfirmModal({ show: false, id: null, name: '' })} className="btn btn-ghost py-3 text-sm cursor-pointer">Back</button>
+          <button onClick={confirmDelete} className="btn btn-danger py-3 text-sm cursor-pointer">Remove</button>
         </div>
-      )}
+      </Modal>
 
-      {/* TOAST */}
-      {toast.show && (
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[3000] bg-indigo-600 text-white px-6 py-3 rounded-full shadow-2xl border border-white/10">
-          <span className="text-[10px] font-black uppercase tracking-[0.2em]">{toast.message}</span>
-        </div>
-      )}
-
-      <style jsx>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.2); border-radius: 20px; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
+      <Toast show={toast.show} message={toast.message} variant="info" onClose={() => setToast({ show: false, message: '' })} />
     </div>
   )
 }

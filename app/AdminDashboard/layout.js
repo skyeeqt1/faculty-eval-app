@@ -2,13 +2,15 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useRouter, usePathname } from 'next/navigation'
+import ThemeToggle from '../../components/ui/ThemeToggle'
+import Modal from '../../components/ui/Modal'
+import { ADMIN_EMAIL, ADMIN_NAV } from '../../lib/constants'
 
 export default function AdminLayout({ children }) {
   const router = useRouter()
   const pathname = usePathname()
   const [loading, setLoading] = useState(true)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
-  const [toast, setToast] = useState({ show: false, message: '' })
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   const getPageTitle = () => {
@@ -44,11 +46,24 @@ export default function AdminLayout({ children }) {
   };
 
   useEffect(() => {
-    // Check for admin session using Supabase Auth
-    const checkAuth = async () => {
+    let cancelled = false;
+
+    const authenticate = async () => {
+      const localSession = sessionStorage.getItem("adminSession")
+      if (localSession) {
+        try {
+          const sessionData = JSON.parse(localSession)
+          if (sessionData.email?.toLowerCase() === ADMIN_EMAIL) {
+            if (!cancelled) setLoading(false)
+            return
+          }
+        } catch (err) {}
+      }
+
       const { data: { session } } = await supabase.auth.getSession()
-      
-      if (session && session.user.email?.toLowerCase() === "admintest@gmail.com") {
+      if (cancelled) return
+
+      if (session && session.user.email?.toLowerCase() === ADMIN_EMAIL) {
         sessionStorage.setItem("adminSession", JSON.stringify({ email: session.user.email }))
         setLoading(false)
       } else {
@@ -56,68 +71,74 @@ export default function AdminLayout({ children }) {
       }
     }
 
-    // Also check localStorage as fallback
-    const adminSession = sessionStorage.getItem("adminSession")
-    if (adminSession) {
-      try {
-        const sessionData = JSON.parse(adminSession)
-        if (sessionData.email?.toLowerCase() === "admintest@gmail.com") {
-          setLoading(false)
-          return
-        }
-      } catch (err) {}
-    }
-    
-    checkAuth()
+    authenticate()
+    return () => { cancelled = true }
   }, [router]);
 
   if (loading) return (
-    <div className="min-h-screen bg-[#0f172a] flex items-center justify-center">
-      <div className="text-center font-bold text-indigo-400 uppercase tracking-[0.3em] animate-pulse">Authenticating Admin...</div>
+    <div className="min-h-screen page-bg flex items-center justify-center">
+      <div className="flex items-center gap-3 text-indigo-600 dark:text-indigo-400 text-xs font-bold uppercase tracking-[0.3em]">
+        <div className="relative w-6 h-6">
+          <div className="absolute inset-0 border-[2.5px] border-indigo-500/10 rounded-full" />
+          <div className="absolute inset-0 border-[2.5px] border-transparent border-t-indigo-600 dark:border-t-indigo-400 rounded-full animate-spin" />
+        </div>
+        Authenticating Admin...
+      </div>
     </div>
   );
 
   const pageTitle = getPageTitle();
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-200 flex font-sans overflow-hidden">
-      
-      {/* SIDEBAR OVERLAY */}
-      <div 
-        className={`fixed inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity duration-300 md:hidden ${
+    <div className="min-h-screen page-bg dark:bg-[#0a0e1f] flex font-sans overflow-hidden">
+
+      {/* SIDEBAR OVERLAY — premium glass blur */}
+      <div
+        className={`fixed inset-0 bg-slate-900/30 dark:bg-black/50 backdrop-blur-xl transition-opacity duration-300 md:hidden ${
           isSidebarOpen ? 'opacity-100 z-[100]' : 'opacity-0 pointer-events-none z-0'
-        }`} 
-        onClick={() => setIsSidebarOpen(false)} 
+        }`}
+        onClick={() => setIsSidebarOpen(false)}
       />
 
-      {/* SIDEBAR */}
+      {/* SIDEBAR — glass morphism */}
       <aside className={`
-        fixed inset-y-0 left-0 w-72 bg-slate-900 border-r border-white/5 flex flex-col 
-        transition-transform duration-300 ease-in-out z-[110]
-        md:relative md:translate-x-0 
+        fixed inset-y-0 left-0 w-72 flex flex-col
+        bg-white/80 dark:bg-[#0f1530]/85
+        backdrop-blur-2xl saturate-150
+        border-r border-slate-200/60 dark:border-indigo-500/8
+        transition-transform duration-300 ease-out z-[110]
+        md:relative md:translate-x-0
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        <div className="p-8 pr-4 flex items-center justify-between shrink-0">
-          <h1 className="text-2xl font-black tracking-tighter text-white uppercase italic">ADMIN<span className="text-indigo-500">Panel</span></h1>
-          <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-3 bg-white/5 rounded-xl text-slate-400">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+        {/* Brand header */}
+        <div className="p-7 pr-4 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl brand-gradient flex items-center justify-center text-white shadow-lg shadow-indigo-500/25">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19l-7-3V9l7-3 7 3v7l-7 3z" /><path d="M9 12v3m6-3v3M9 12V9m6 3V9" /></svg>
+            </div>
+            <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white">Admin<span className="text-gradient">Panel</span></h1>
+          </div>
+          <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-2.5 bg-slate-100 dark:bg-slate-800/60 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
 
-        <nav className="flex-1 px-4 space-y-2 overflow-y-auto custom-scrollbar">
-          <SidebarLink icon="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" label="Dashboard" active={isLinkActive('/AdminDashboard')} onClick={() => navigateTo('/AdminDashboard')} />
-          <SidebarLink icon="M16 7a4 4 0 11-8 0 4 4 0 018 0z" label="Faculty" active={isLinkActive('Faculty')} onClick={() => navigateTo('/AdminDashboard/Faculty')} />
-          <SidebarLink icon="M12 14l9-5-9-5-9 5 9 5z" label="Students" active={isLinkActive('StudentList')} onClick={() => navigateTo('/AdminDashboard/StudentList')} />
-          <SidebarLink icon="M12 6.253v13" label="Subjects" active={isLinkActive('Subjects')} onClick={() => navigateTo('/AdminDashboard/Subjects')} />
-          <SidebarLink icon="M9 19v-6" label="Results" active={isLinkActive('Results')} onClick={() => navigateTo('/AdminDashboard/Results')} />
-          <SidebarLink icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" label="Activity Logs" active={isLinkActive('Logs')} onClick={() => navigateTo('/AdminDashboard/Logs')} />
+        {/* Separator */}
+        <div className="separator-line mx-5" />
+
+        {/* Navigation */}
+        <nav className="flex-1 px-4 pt-4 pb-2 space-y-1 overflow-y-auto scrollbar-thin">
+          <p className="overline px-4 pb-2 pt-1">Navigation</p>
+          {ADMIN_NAV.map(item => (
+            <SidebarLink key={item.path} icon={item.icon} label={item.label} active={isLinkActive(item.path)} onClick={() => navigateTo(item.path)} />
+          ))}
         </nav>
 
-        {/* LOGOUT CONTAINER */}
-        <div className="p-4 border-t border-white/5 bg-slate-900 logout-container">
-          <button 
-            onClick={() => setShowLogoutModal(true)} 
-            className="w-full px-4 py-4 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 rounded-2xl font-black text-[9px] uppercase tracking-widest transition-all cursor-pointer active:scale-95 shadow-lg shadow-rose-500/5"
+        {/* Logout */}
+        <div className="p-4 border-t border-slate-100/60 dark:border-indigo-500/8">
+          <button
+            onClick={() => setShowLogoutModal(true)}
+            className="w-full px-4 py-3.5 bg-rose-50 dark:bg-rose-500/8 hover:bg-rose-100 dark:hover:bg-rose-500/15 text-rose-600 dark:text-rose-400 rounded-xl font-bold text-xs uppercase tracking-wider transition-all active:scale-[0.97] border border-rose-100 dark:border-rose-500/10"
           >
             Logout Session
           </button>
@@ -126,17 +147,21 @@ export default function AdminLayout({ children }) {
 
       {/* MAIN LAYOUT */}
       <main className="flex-1 relative overflow-hidden flex flex-col min-w-0">
-        <header className="md:hidden flex items-center justify-between p-6 bg-slate-900/50 backdrop-blur-md border-b border-white/5 sticky top-0 z-[40]">
+        {/* Mobile header — glass */}
+        <header className="md:hidden flex items-center justify-between p-5 bg-white/70 dark:bg-[#0a0e1f]/70 backdrop-blur-xl border-b border-slate-200/60 dark:border-indigo-500/8 sticky top-0 z-[40]">
           <div>
-            <h2 className="text-lg font-black text-white uppercase italic tracking-tight leading-none">{pageTitle.main}</h2>
-            <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest mt-1">{pageTitle.sub}</p>
+            <h2 className="text-lg font-black text-slate-900 dark:text-white leading-none">{pageTitle.main}</h2>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider mt-1">{pageTitle.sub}</p>
           </div>
-          <button 
-            onClick={() => setIsSidebarOpen(true)} 
-            className="p-3 bg-slate-800 rounded-xl text-indigo-400 border border-white/5 shadow-lg active:scale-95 transition-all relative z-[50]"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16m-7 6h7" /></svg>
-          </button>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-3 bg-white dark:bg-slate-800/60 rounded-xl text-indigo-600 dark:text-indigo-300 border border-slate-200 dark:border-slate-700/60 shadow-md active:scale-95 transition-all relative z-[50]"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16m-7 6h7" /></svg>
+            </button>
+          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto relative">
@@ -145,43 +170,34 @@ export default function AdminLayout({ children }) {
       </main>
 
       {/* LOGOUT MODAL */}
-      {showLogoutModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-[2000] bg-slate-950/90 backdrop-blur-md p-4">
-          <div className="bg-slate-900 border border-white/10 rounded-[2.5rem] p-8 max-sm:w-full max-w-sm shadow-2xl text-center">
-            <h3 className="text-xl font-black text-white mb-2 uppercase italic leading-tight">Do you want to logout?</h3>
-            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-8">Confirm to end your admin session</p>
-            <div className="grid grid-cols-2 gap-4">
-              <button onClick={() => setShowLogoutModal(false)} className="py-4 bg-slate-800 text-slate-300 rounded-2xl font-black text-[10px] uppercase cursor-pointer">No, Stay</button>
-              <button onClick={handleLogout} className="py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase cursor-pointer shadow-lg shadow-indigo-600/20 active:scale-95">Yes, Logout</button>
-            </div>
-          </div>
+      <Modal open={showLogoutModal} onClose={() => setShowLogoutModal(false)}>
+        <h3 className="text-xl font-extrabold text-slate-900 dark:text-white mb-2">End admin session?</h3>
+        <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 leading-relaxed">Confirm to log out of the admin panel.</p>
+        <div className="grid grid-cols-2 gap-3">
+          <button onClick={() => setShowLogoutModal(false)} className="btn btn-ghost py-3.5 text-sm font-bold">Cancel</button>
+          <button onClick={handleLogout} className="btn btn-primary py-3.5 text-sm font-bold">Yes, Logout</button>
         </div>
-      )}
-
-      <style jsx>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.1); border-radius: 20px; }
-      `}</style>
+      </Modal>
     </div>
   )
 }
 
 function SidebarLink({ icon, label, onClick, active = false }) {
   return (
-    <button 
+    <button
       type="button"
       onClick={onClick}
-      className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-200 group pointer-events-auto ${
-        active 
-          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
-          : 'text-slate-500 hover:bg-white/5 hover:text-slate-200 cursor-pointer'
+      className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-200 group magnetic ${
+        active
+          ? 'brand-gradient text-white shadow-lg shadow-indigo-500/25'
+          : 'text-slate-400 dark:text-slate-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/8 hover:text-indigo-600 dark:hover:text-indigo-300 cursor-pointer'
       }`}
     >
-      <svg className={`w-5 h-5 ${active ? 'text-white' : 'text-slate-600 group-hover:text-indigo-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={icon} />
+      <svg className={`w-5 h-5 transition-colors ${active ? 'text-white' : 'text-slate-400 dark:text-slate-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d={icon} />
       </svg>
-      <span className="text-[11px] font-black uppercase tracking-widest">{label}</span>
+      <span className="text-[12px] font-bold">{label}</span>
+      {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white/70" />}
     </button>
   )
 }
